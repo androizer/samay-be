@@ -1,4 +1,4 @@
-import { PrismaClient, User } from "@prisma/client";
+import { PrismaClient, User, Role } from "@prisma/client";
 import * as argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import { AuthResponse, LoginInput, RegisterInput, UserResponse } from "./types";
@@ -32,23 +32,47 @@ export async function register(
   // Hash password
   const hashedPassword = await argon2.hash(password);
 
-  // Create user
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      name,
-    },
+  // Create user and default workspace in transaction
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+      },
+    });
+
+    const workspace = await tx.workspace.create({
+      data: {
+        name: `${name}'s Workspace`,
+        ownerId: user.id,
+        members: {
+          create: {
+            userId: user.id,
+            role: Role.ADMIN,
+          },
+        },
+      },
+    });
+
+    const updatedUser = await tx.user.update({
+      where: { id: user.id },
+      data: { defaultWorkspaceId: workspace.id },
+    });
+
+    return { user: updatedUser, workspace };
   });
 
+  const { user, workspace } = result;
+
   // Generate JWT token
-  const token = generateToken(user);
+  const token = generateToken(user, workspace.id);
 
   // Create session
   await createSession(user.id, token, prisma);
 
   // Destructure user object for response
-  const { id, role, createdAt } = user;
+  const { id, role, createdAt, defaultWorkspaceId } = user;
 
   return {
     user: {
@@ -57,8 +81,16 @@ export async function register(
       name,
       role,
       createdAt,
+      defaultWorkspaceId,
     },
     token,
+    workspaces: [
+      {
+        id: workspace.id,
+        name: workspace.name,
+        role: Role.ADMIN,
+      },
+    ],
   };
 }
 
@@ -87,8 +119,47 @@ export async function login(
     throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
+  // Get user's workspaces
+  let workspaces = await prisma.workspaceMember.findMany({
+    where: { userId: user.id },
+    include: { workspace: true },
+  });
+
+  let defaultWorkspaceId = user.defaultWorkspaceId;
+
+  // Migration: Create default workspace if none exists
+  if (workspaces.length === 0) {
+    const workspace = await prisma.workspace.create({
+      data: {
+        name: `${user.name}'s Workspace`,
+        ownerId: user.id,
+        members: {
+          create: {
+            userId: user.id,
+            role: Role.ADMIN,
+          },
+        },
+      },
+    });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { defaultWorkspaceId: workspace.id },
+    });
+
+    // Refresh workspaces list
+    workspaces = await prisma.workspaceMember.findMany({
+      where: { userId: user.id },
+      include: { workspace: true },
+    });
+    defaultWorkspaceId = workspace.id;
+  }
+
+  // Determine target workspace
+  const targetWorkspaceId = defaultWorkspaceId || workspaces[0].workspace.id;
+
   // Generate JWT token
-  const token = generateToken(user);
+  const token = generateToken(user, targetWorkspaceId);
 
   // Create session
   await createSession(user.id, token, prisma);
@@ -109,8 +180,14 @@ export async function login(
       name: userName,
       role: userRole,
       createdAt,
+      defaultWorkspaceId,
     },
     token,
+    workspaces: workspaces.map((w) => ({
+      id: w.workspace.id,
+      name: w.workspace.name,
+      role: w.role,
+    })),
   };
 }
 
@@ -238,10 +315,11 @@ export async function getUserById(
 /**
  * Generate JWT token
  */
-function generateToken(user: User): string {
+function generateToken(user: User, workspaceId: string): string {
   const payload = {
     userId: user.id,
     role: user.role,
+    workspaceId,
   };
 
   return jwt.sign(payload, JWT_SECRET, {

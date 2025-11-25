@@ -7,31 +7,64 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  password     String
-  name         String
-  role         Role          @default(USER)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  activities   Activity[]
-  projectUsers ProjectUser[]
-  sessions     Session[]
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+  projects  Project[]
+  activities Activity[]
+  tags      Tag[]
   dailyInsights DailyInsight[]
+  
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role      @default(USER)
+  joinedAt    DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  password           String
+  name               String
+  role               Role              @default(USER)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  isVerified         Boolean           @default(false)
+  defaultWorkspaceId String?
+  activities         Activity[]
+  projectUsers       ProjectUser[]
+  sessions           Session[]
+  dailyInsights      DailyInsight[]
+  workspaces         WorkspaceMember[]
 
   @@map("users")
 }
 
 model DailyInsight {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  dailyInsights   Json     // Stored as JSONB
-  improvementPlan Json     // Stored as JSONB
-  date            DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  workspaceId     String?
+  user            User      @relation(fields: [userId], references: [id])
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dailyInsights   Json      // Stored as JSONB
+  improvementPlan Json      // Stored as JSONB
+  date            DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])
@@ -51,34 +84,38 @@ model Session {
 }
 
 model Activity {
-  id          String   @id @default(cuid())
-  userId      String
-  app         String
-  url         String
-  title       String
-  description String?
-  timestamp   String
+  id              String     @id @default(cuid())
+  userId          String
+  workspaceId     String?
+  app             String
+  url             String
+  title           String
+  description     String?
+  timestamp       String
   mergedTimestamp String?
-  duration    Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  merged      Boolean  @default(false)
-  selected    Boolean  @default(false)
-  projectId   Int?
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  autoTags    String?
-  isAutoTagged Boolean @default(false)
+  duration        Int?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  merged          Boolean    @default(false)
+  selected        Boolean    @default(false)
+  projectId       Int?
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  autoTags        String?
+  isAutoTagged    Boolean    @default(false)
   @@map("activities")
 }
 
 model Project {
   id          Int           @id @default(autoincrement())
+  workspaceId String?
   name        String
   description String?
   icon        String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now())
+  workspace   Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   users       ProjectUser[]
   activities  Activity[]
 
@@ -98,12 +135,14 @@ model ProjectUser {
 
 
 model Tag {
-  id          Int           @id @default(autoincrement())
-  app        String
-  title String
-  tag     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  workspaceId String?
+  app         String
+  title       String
+  tag         String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@map("tags")
 }
 
