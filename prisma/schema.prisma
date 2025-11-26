@@ -16,7 +16,6 @@ model Workspace {
   members   WorkspaceMember[]
   projects  Project[]
   activities Activity[]
-  tags      Tag[]
   dailyInsights DailyInsight[]
   
   @@map("workspaces")
@@ -136,13 +135,11 @@ model ProjectUser {
 
 model Tag {
   id          Int       @id @default(autoincrement())
-  workspaceId String?
   app         String
   title       String
   tag         String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@map("tags")
 }
 
