@@ -28,8 +28,9 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       body: CREATE_PROJECT_SCHEMA,
     },
     handler: async (request, reply) => {
+      const { workspaceId = "" } = request.user || {};
       const input = request.body;
-      const result = await createProject(prisma, input);
+      const result = await createProject(prisma, input, workspaceId);
 
       return reply.status(201).send({
         data: result,
@@ -43,8 +44,8 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/",
     handler: async (request, reply) => {
-      const { userId = "", role = "" } = request.user || {};
-      const result = await getProjects(prisma, userId, role == "ADMIN");
+      const { userId = "", role = "", workspaceId = "" } = request.user || {};
+      const result = await getProjects(prisma, userId, workspaceId, role == "ADMIN");
 
       return reply.send({
         data: result,
@@ -60,13 +61,14 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       params: PROJECT_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", role = "" } = request.user || {};
+      const { userId = "", role = "", workspaceId = "" } = request.user || {};
       const { id } = request.params;
       const projectId = parseInt(id);
 
       const result = await getProject(
         prisma,
         userId,
+        workspaceId,
         role == "ADMIN",
         projectId
       );
@@ -86,12 +88,13 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       body: UPDATE_PROJECT_SCHEMA,
     },
     handler: async (request, reply) => {
+      const { workspaceId = "" } = request.user || {};
       const { id } = request.params;
       const projectId = parseInt(id);
 
       const input = request.body;
 
-      const result = await updateProject(prisma, projectId, input);
+      const result = await updateProject(prisma, projectId, workspaceId, input);
       return reply.send({
         data: result,
         message: "Project updated successfully",
@@ -107,10 +110,11 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       params: PROJECT_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
+      const { workspaceId = "" } = request.user || {};
       const { id } = request.params;
       const projectId = parseInt(id);
 
-      await deleteProject(prisma, projectId);
+      await deleteProject(prisma, projectId, workspaceId);
       return reply.send({
         message: "Project deleted successfully",
       });

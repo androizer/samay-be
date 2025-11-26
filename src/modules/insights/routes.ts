@@ -11,7 +11,7 @@ export default async function insightRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { date } = request.query as { date?: string };
-      const { userId = "" } = request.user || {};
+      const { userId = "", workspaceId = "" } = request.user || {};
 
       const insight = await getDailyInsight(fastify, userId, date);
 

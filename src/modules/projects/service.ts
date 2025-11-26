@@ -11,12 +11,14 @@ import {
  */
 export async function createProject(
   prisma: PrismaClient,
-  input: CreateProjectInput
+  input: CreateProjectInput,
+  workspaceId: string
 ): Promise<ProjectResponse> {
   const project = await prisma.project.create({
     data: {
       ...input,
       icon: input.icon || "",
+      workspaceId,
     },
   });
 
@@ -29,11 +31,13 @@ export async function createProject(
 export async function getProjects(
   prisma: PrismaClient,
   userId: string,
+  workspaceId: string,
   isAdmin: boolean
 ): Promise<ProjectResponse[]> {
   const [projects] = await Promise.all([
     prisma.project.findMany({
       where: {
+        workspaceId,
         users: isAdmin ? undefined : { some: { userId } },
       },
       orderBy: { createdAt: "desc" },
@@ -70,6 +74,7 @@ export async function getProjects(
 export async function getProject(
   prisma: PrismaClient,
   userId: string,
+  workspaceId: string,
   isAdmin: boolean,
   id: number
 ): Promise<ProjectResponse | null> {
@@ -95,7 +100,9 @@ export async function getProject(
         },
       },
     },
-    where: isAdmin ? { id } : { id, users: { some: { userId } } },
+    where: isAdmin
+      ? { id, workspaceId }
+      : { id, workspaceId, users: { some: { userId } } },
   });
 
   return project;
@@ -107,10 +114,11 @@ export async function getProject(
 export async function updateProject(
   prisma: PrismaClient,
   id: number,
+  workspaceId: string,
   input: UpdateProjectInput
 ): Promise<ProjectResponse> {
   const project = await prisma.project.update({
-    where: { id },
+    where: { id, workspaceId },
     data: {
       ...input,
       updatedAt: new Date(),
@@ -125,16 +133,18 @@ export async function updateProject(
  */
 export async function deleteProject(
   prisma: PrismaClient,
-  id: number
+  id: number,
+  workspaceId: string
 ): Promise<void> {
   await prisma.project.delete({
-    where: { id },
+    where: { id, workspaceId },
   });
 }
 
 /**
  * Add users to a project
  */
+// Add workspace check
 export async function addUsersToProject(
   prisma: PrismaClient,
   projectId: number,

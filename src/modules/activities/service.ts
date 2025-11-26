@@ -65,6 +65,7 @@ function sanitizeActivityData(
 export async function createActivity(
   activities: CreateActivityInput[],
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ) {
   const tags = await getTags(prisma);
@@ -79,6 +80,7 @@ export async function createActivity(
         timestamp,
         duration,
         userId,
+        workspaceId,
       };
     })
     .filter((activity) => {
@@ -123,6 +125,7 @@ export async function getTags(prisma: PrismaClient): Promise<Tag[]> {
  */
 export async function getActivities(
   userId: string,
+  workspaceId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -134,6 +137,7 @@ export async function getActivities(
   const activities = await prisma.activity.findMany({
     where: {
       userId,
+      workspaceId,
       createdAt: {
         gte: new Date(startDate || ""),
         lte: new Date(endDate || ""),
@@ -152,13 +156,14 @@ export async function updateActivity(
   id: string,
   input: UpdateActivityInput,
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<ActivityResponse> {
   const { data = {}, timestamp, duration, description } = input;
   const tags = await getTags(prisma);
   const sanitizedData = data ? sanitizeActivityData(data, tags) : {};
   const activity = await prisma.activity.update({
-    where: { id, userId },
+    where: { id, userId, workspaceId },
     data: {
       ...sanitizedData,
       timestamp,
@@ -176,10 +181,11 @@ export async function updateActivity(
 export async function deleteActivity(
   id: string,
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<void> {
   await prisma.activity.delete({
-    where: { id, userId },
+    where: { id, userId, workspaceId },
   });
 }
 
@@ -188,6 +194,7 @@ export async function deleteActivity(
  */
 export async function getActivityStats(
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<{
   totalActivities: number;
@@ -197,20 +204,20 @@ export async function getActivityStats(
 }> {
   const [totalActivities, totalDuration, topApps, recentActivity] =
     await Promise.all([
-      prisma.activity.count({ where: { userId } }),
+      prisma.activity.count({ where: { userId, workspaceId } }),
       prisma.activity.aggregate({
-        where: { userId },
+        where: { userId, workspaceId },
         _sum: { duration: true },
       }),
       prisma.activity.groupBy({
         by: ["app"],
-        where: { userId },
+        where: { userId, workspaceId },
         _sum: { duration: true },
         orderBy: { _sum: { duration: "desc" } },
         take: 5,
       }),
       prisma.activity.findFirst({
-        where: { userId },
+        where: { userId, workspaceId },
         orderBy: { createdAt: "desc" },
       }),
     ]);
@@ -231,6 +238,7 @@ export async function getActivityStats(
  */
 export async function getTopApps(
   userId: string,
+  workspaceId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -248,6 +256,7 @@ export async function getTopApps(
     by: ["app"],
     where: {
       userId,
+      workspaceId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -267,6 +276,7 @@ export async function getTopApps(
     by: ["autoTags"],
     where: {
       userId,
+      workspaceId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -296,6 +306,7 @@ export async function getTopApps(
  */
 export async function getTopActivities(
   userId: string,
+  workspaceId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -308,6 +319,7 @@ export async function getTopActivities(
     by: ["app", "title", "autoTags"],
     where: {
       userId,
+      workspaceId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -333,6 +345,7 @@ export async function getTopActivities(
 export async function selectActivities(
   activityIds: string[],
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient,
   selected: boolean
 ): Promise<void> {
@@ -341,6 +354,7 @@ export async function selectActivities(
     where: {
       id: { in: activityIds },
       userId,
+      workspaceId,
     },
     data: {
       selected,
@@ -425,6 +439,7 @@ export function groupActivitiesByEntity(
 
 export async function activitiesForSelection(
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient,
   startDate: string,
   endDate: string
@@ -443,6 +458,7 @@ export async function activitiesForSelection(
   const activities = await prisma.activity.findMany({
     where: {
       userId,
+      workspaceId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -463,12 +479,14 @@ export async function addActivitiesToProject(
   activityIds: string[],
   projectId: number,
   userId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<void> {
   // First verify that the project exists and the user has access to it
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
+      workspaceId,
       users: {
         some: {
           userId,
@@ -487,6 +505,7 @@ export async function addActivitiesToProject(
     where: {
       id: { in: activityIds },
       userId,
+      workspaceId,
     },
     data: {
       projectId,
@@ -499,6 +518,7 @@ export async function addActivitiesToProject(
  */
 export async function getUserSelectData(
   userId: string,
+  workspaceId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -529,6 +549,7 @@ export async function getUserSelectData(
     FROM activities 
     WHERE 
       "userId" = ${userId}
+      AND "workspaceId" = ${workspaceId}
       AND selected = true
       AND app NOT IN (${Prisma.join(EXCLUDED_APPS)})
       ${startDate ? Prisma.sql`AND timestamp >= ${startDate}` : Prisma.empty}
@@ -541,6 +562,7 @@ export async function getUserSelectData(
     by: ["autoTags"],
     where: {
       userId,
+      workspaceId,
       selected: true,
       app: { notIn: EXCLUDED_APPS },
       timestamp: {

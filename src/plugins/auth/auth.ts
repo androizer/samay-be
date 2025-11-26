@@ -30,9 +30,12 @@ const authMiddleware: FastifyPluginAsync = fp(async (fastify) => {
     const user = await validateToken(token, fastify.prisma);
     if (!user) throw new AppError("JsonWebTokenError", 401);
 
+    // FIXME: Get workspaceId from session
+
     const payload: JWTPayload = {
       userId: user.id,
       role: user.role,
+      workspaceId: "",
     };
 
     // Check admin routes access

@@ -16,7 +16,6 @@ model Workspace {
   members   WorkspaceMember[]
   projects  Project[]
   activities Activity[]
-  dailyInsights DailyInsight[]
   
   @@map("workspaces")
 }
@@ -56,9 +55,7 @@ model User {
 model DailyInsight {
   id              String    @id @default(cuid())
   userId          String
-  workspaceId     String?
   user            User      @relation(fields: [userId], references: [id])
-  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   dailyInsights   Json      // Stored as JSONB
   improvementPlan Json      // Stored as JSONB
   date            DateTime  @default(now())
