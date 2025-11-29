@@ -11,9 +11,9 @@ export default async function insightRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { date } = request.query as { date?: string };
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
 
-      const insight = await getDailyInsight(fastify, userId, date);
+      const insight = await getDailyInsight(fastify, profileId, date);
 
       if (!insight) {
         return reply.status(404).send({ message: "No insights found for this date" });

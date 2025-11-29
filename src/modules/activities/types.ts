@@ -12,7 +12,7 @@ export type UserSelectDataQuery = z.infer<typeof USER_SELECT_DATA_QUERY_SCHEMA>;
 // Activity interface (partial of Prisma Activity)
 export interface ActivityResponse {
   id: string;
-  userId: string;
+  profileId: string;
   app: string;
   url: string;
   title: string;

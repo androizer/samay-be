@@ -28,9 +28,9 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       body: CREATE_PROJECT_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { workspaceId = "" } = request.user || {};
+      const { workspaceId = "", profileId = "" } = request.user || {};
       const input = request.body;
-      const result = await createProject(prisma, input, workspaceId);
+      const result = await createProject(prisma, input, workspaceId, profileId);
 
       return reply.status(201).send({
         data: result,
@@ -44,8 +44,8 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/",
     handler: async (request, reply) => {
-      const { userId = "", role = "", workspaceId = "" } = request.user || {};
-      const result = await getProjects(prisma, userId, workspaceId, role == "ADMIN");
+      const { profileId = "", role = "", workspaceId = "" } = request.user || {};
+      const result = await getProjects(prisma, profileId, workspaceId, role == "ADMIN");
 
       return reply.send({
         data: result,
@@ -61,13 +61,13 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       params: PROJECT_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", role = "", workspaceId = "" } = request.user || {};
+      const { profileId = "", role = "", workspaceId = "" } = request.user || {};
       const { id } = request.params;
       const projectId = parseInt(id);
 
       const result = await getProject(
         prisma,
-        userId,
+        profileId,
         workspaceId,
         role == "ADMIN",
         projectId
@@ -144,15 +144,15 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
   // Delete users from project
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "DELETE",
-    url: "/:id/users/:userId",
+    url: "/:id/users/:profileId",
     schema: {
       params: DELETE_USERS_FROM_PROJECT_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { id, userId } = request.params;
+      const { id, profileId } = request.params;
       const projectId = parseInt(id);
 
-      await deleteUsersFromProject(prisma, projectId, userId);
+      await deleteUsersFromProject(prisma, projectId, profileId);
       return reply.send({
         message: "Users removed from project successfully",
       });

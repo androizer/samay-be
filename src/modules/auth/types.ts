@@ -9,19 +9,21 @@ export interface UserResponse {
   id: string;
   email: string;
   name: string | null;
-  role: string;
   createdAt: Date;
-  defaultWorkspaceId?: string | null;
 }
 
-export interface WorkspaceResponse {
+export interface ProfileResponse {
   id: string;
-  name: string;
+  workspaceId: string;
   role: string;
+  workspace: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface AuthResponse {
   user: UserResponse;
   token: string;
-  workspaces: WorkspaceResponse[];
+  profiles: ProfileResponse[];
 }

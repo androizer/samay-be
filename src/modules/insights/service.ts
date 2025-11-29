@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 
 export async function getDailyInsight(
   fastify: FastifyInstance,
-  userId: string,
+  profileId: string,
   date?: string
 ) {
   const targetDate = date ? new Date(date) : new Date();
@@ -28,7 +28,7 @@ export async function getDailyInsight(
 
   const insight = await fastify.prisma.dailyInsight.findFirst({
     where: {
-      userId,
+      profileId,
       date: {
         gte: startOfDay,
         lte: endOfDay,

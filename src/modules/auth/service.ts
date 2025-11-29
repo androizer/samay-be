@@ -1,5 +1,6 @@
 import { PrismaClient, User, Role } from "@prisma/client";
 import * as argon2 from "argon2";
+import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 import { AuthResponse, LoginInput, RegisterInput, UserResponse } from "./types";
 import { AppError } from "../../plugins/error/plugin";
@@ -46,49 +47,49 @@ export async function register(
       data: {
         name: `${name}'s Workspace`,
         ownerId: user.id,
-        members: {
+        profiles: {
           create: {
             userId: user.id,
+            name: name,
             role: Role.ADMIN,
           },
         },
       },
     });
 
-    const updatedUser = await tx.user.update({
-      where: { id: user.id },
-      data: { defaultWorkspaceId: workspace.id },
+    // Fetch the created profile
+    const profile = await tx.profile.findFirstOrThrow({
+      where: { workspaceId: workspace.id, userId: user.id },
     });
 
-    return { user: updatedUser, workspace };
+    return { user, workspace, profile };
   });
 
-  const { user, workspace } = result;
+  const { user, workspace, profile } = result;
 
   // Generate JWT token
-  const token = generateToken(user, workspace.id);
+  const token = generateToken(user, profile.id, workspace.id, Role.ADMIN);
 
   // Create session
   await createSession(user.id, token, prisma);
 
-  // Destructure user object for response
-  const { id, role, createdAt, defaultWorkspaceId } = user;
-
   return {
     user: {
-      id,
-      email,
-      name,
-      role,
-      createdAt,
-      defaultWorkspaceId,
+      id: user.id,
+      email: user.email,
+      name: name, // Return the name provided during registration
+      createdAt: user.createdAt,
     },
     token,
-    workspaces: [
+    profiles: [
       {
-        id: workspace.id,
-        name: workspace.name,
+        id: profile.id,
+        workspaceId: workspace.id,
         role: Role.ADMIN,
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+        },
       },
     ],
   };
@@ -119,74 +120,61 @@ export async function login(
     throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
-  // Get user's workspaces
-  let workspaces = await prisma.workspaceMember.findMany({
+  // Get user's profiles
+  let profiles = await prisma.profile.findMany({
     where: { userId: user.id },
     include: { workspace: true },
   });
 
-  let defaultWorkspaceId = user.defaultWorkspaceId;
-
-  // Migration: Create default workspace if none exists
-  if (workspaces.length === 0) {
+  // Migration: Create default workspace if none exists (legacy support)
+  if (profiles.length === 0) {
     const workspace = await prisma.workspace.create({
       data: {
-        name: `${user.name}'s Workspace`,
+        name: "My Workspace",
         ownerId: user.id,
-        members: {
+        profiles: {
           create: {
             userId: user.id,
+            name: "User", // Default name
             role: Role.ADMIN,
           },
         },
       },
     });
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { defaultWorkspaceId: workspace.id },
-    });
-
-    // Refresh workspaces list
-    workspaces = await prisma.workspaceMember.findMany({
+    // Refresh profiles list
+    profiles = await prisma.profile.findMany({
       where: { userId: user.id },
       include: { workspace: true },
     });
-    defaultWorkspaceId = workspace.id;
   }
 
-  // Determine target workspace
-  const targetWorkspaceId = defaultWorkspaceId || workspaces[0].workspace.id;
+  // Determine target profile (default to first one)
+  // In a real app, client might send a preferred workspaceId, or we store last accessed
+  const targetProfile = profiles[0];
 
   // Generate JWT token
-  const token = generateToken(user, targetWorkspaceId);
+  const token = generateToken(user, targetProfile.id, targetProfile.workspaceId, targetProfile.role);
 
   // Create session
   await createSession(user.id, token, prisma);
 
-  // Destructure user object for response
-  const {
-    id,
-    email: userEmail,
-    name: userName,
-    role: userRole,
-    createdAt,
-  } = user;
-
   return {
     user: {
-      id,
-      email: userEmail,
-      name: userName,
-      role: userRole,
-      createdAt,
-      defaultWorkspaceId,
+      id: user.id,
+      email: user.email,
+      name: null, // User model doesn't have name anymore, it's on Profile
+      createdAt: user.createdAt,
     },
     token,
-    workspaces: workspaces.map((w) => ({
-      id: w.workspace.id,
-      name: w.workspace.name,
-      role: w.role,
+    profiles: profiles.map((p) => ({
+      id: p.id,
+      workspaceId: p.workspaceId,
+      role: p.role,
+      workspace: {
+        id: p.workspace.id,
+        name: p.workspace.name,
+      },
     })),
   };
 }
@@ -253,7 +241,6 @@ export async function getCurrentUser(
       id: true,
       email: true,
       name: true,
-      role: true,
       createdAt: true,
     },
   });
@@ -276,8 +263,8 @@ export async function getAllUsers(
       id: true,
       email: true,
       name: true,
-      role: true,
       createdAt: true,
+      updatedAt: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -300,7 +287,6 @@ export async function getUserById(
       id: true,
       email: true,
       name: true,
-      role: true,
       createdAt: true,
     },
   });
@@ -315,11 +301,16 @@ export async function getUserById(
 /**
  * Generate JWT token
  */
-function generateToken(user: User, workspaceId: string): string {
+/**
+ * Generate JWT token
+ */
+function generateToken(user: User, profileId: string, workspaceId: string, role: Role): string {
   const payload = {
     userId: user.id,
-    role: user.role,
+    profileId,
     workspaceId,
+    role,
+    jti: randomUUID(),
   };
 
   return jwt.sign(payload, JWT_SECRET, {

@@ -36,9 +36,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: z.array(CREATE_ACTIVITY_SCHEMA),
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const input = request.body;
-      await createActivity(input, userId, workspaceId, prisma);
+      await createActivity(input, profileId, prisma);
 
       return reply.status(201).send({
         message: "Activities created successfully",
@@ -54,9 +54,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getActivities(userId, workspaceId, query, prisma);
+      const result = await getActivities(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -69,8 +69,8 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/stats",
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
-      const result = await getActivityStats(userId, workspaceId, prisma);
+      const { profileId = "" } = request.user || {};
+      const result = await getActivityStats(profileId, prisma);
 
       return reply.send({
         data: result,
@@ -86,9 +86,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: TOP_ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getTopApps(userId, workspaceId, query, prisma);
+      const result = await getTopApps(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -104,9 +104,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: TOP_ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getTopActivities(userId, workspaceId, query, prisma);
+      const result = await getTopActivities(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -123,10 +123,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: UPDATE_ACTIVITY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { id } = request.params;
       const input = request.body;
-      const result = await updateActivity(id, input, userId, workspaceId, prisma);
+      const result = await updateActivity(id, input, profileId, prisma);
 
       return reply.send({
         data: result,
@@ -142,9 +142,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       params: ACTIVITY_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { id } = request.params;
-      await deleteActivity(id, userId, workspaceId, prisma);
+      await deleteActivity(id, profileId, prisma);
 
       return reply.send({
         message: "Activity deleted successfully",
@@ -160,10 +160,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: SELECT_ACTIVITIES_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { activityIds, selected } = request.body;
       // TODO: Assign project to activities
-      await selectActivities(activityIds, userId, workspaceId, prisma, selected);
+      await selectActivities(activityIds, profileId, prisma, selected);
 
       return reply.send({
         message: "Activities selected successfully",
@@ -179,11 +179,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { startDate = "", endDate = "" } = request.query;
       const result = await activitiesForSelection(
-        userId,
-        workspaceId,
+        profileId,
         prisma,
         startDate,
         endDate
@@ -203,11 +202,11 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: ADD_PROJECT_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { activityIds, projectId } = request.body;
 
       try {
-        await addActivitiesToProject(activityIds, projectId, userId, workspaceId, prisma);
+        await addActivitiesToProject(activityIds, projectId, profileId, prisma);
 
         return reply.send({
           message: "Activities added to project successfully",
@@ -230,12 +229,11 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: USER_SELECT_DATA_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "", workspaceId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { startDate, endDate } = request.query;
 
       const result = await getUserSelectData(
-        userId,
-        workspaceId,
+        profileId,
         { startDate, endDate },
         prisma
       );
@@ -256,14 +254,25 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { userId } = request.params;
-      const { workspaceId = "" } = request.user || {}; // Use requester's workspace context?
-      // Or should we use the target user's default workspace?
-      // For now, let's assume admin viewing another user in the CURRENT workspace context.
+      const { workspaceId = "" } = request.user || {}; 
+      
+      const profile = await prisma.profile.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId,
+          },
+        },
+      });
+
+      if (!profile) {
+        return reply.status(404).send({ message: "User not found in workspace" });
+      }
+
       const { startDate, endDate } = request.query;
 
       const result = await getUserSelectData(
-        userId,
-        workspaceId,
+        profile.id,
         { startDate, endDate },
         prisma
       );

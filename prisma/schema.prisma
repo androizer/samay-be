@@ -13,57 +13,75 @@ model Workspace {
   ownerId   String
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
-  members   WorkspaceMember[]
+  profiles  Profile[]
   projects  Project[]
-  activities Activity[]
+  invitations Invitation[]
+
   
   @@map("workspaces")
 }
 
-model WorkspaceMember {
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  workspaceId String
+  role        Role      @default(USER)
+  token       String    @unique
+  expiresAt   DateTime
+  inviterId   String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter     User      @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([email, workspaceId])
+  @@map("invitations")
+}
+
+model Profile {
   id          String    @id @default(cuid())
   workspaceId String
   userId      String
+  name               String
   role        Role      @default(USER)
   joinedAt    DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified         Boolean           @default(false)
+  activities  Activity[]
+  projectUsers ProjectUser[]
+  dailyInsights DailyInsight[]
 
   @@unique([workspaceId, userId])
-  @@map("workspace_members")
+  @@map("profiles")
 }
+
 
 model User {
   id                 String            @id @default(cuid())
   email              String            @unique
   password           String
-  name               String
-  role               Role              @default(USER)
+  name               String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
-  isVerified         Boolean           @default(false)
-  defaultWorkspaceId String?
-  activities         Activity[]
-  projectUsers       ProjectUser[]
   sessions           Session[]
-  dailyInsights      DailyInsight[]
-  workspaces         WorkspaceMember[]
+  profiles           Profile[]
+  invitations        Invitation[]
 
   @@map("users")
 }
 
 model DailyInsight {
   id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   dailyInsights   Json      // Stored as JSONB
   improvementPlan Json      // Stored as JSONB
   date            DateTime  @default(now())
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  @@unique([userId, date])
-  @@index([userId, date])
+  @@unique([profileId, date])
+  @@index([profileId, date])
   @@map("daily_insights")
 }
 
@@ -81,8 +99,7 @@ model Session {
 
 model Activity {
   id              String     @id @default(cuid())
-  userId          String
-  workspaceId     String?
+  profileId       String
   app             String
   url             String
   title           String
@@ -95,8 +112,7 @@ model Activity {
   merged          Boolean    @default(false)
   selected        Boolean    @default(false)
   projectId       Int?
-  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile         Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   project         Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   autoTags        String?
   isAutoTagged    Boolean    @default(false)
@@ -105,13 +121,13 @@ model Activity {
 
 model Project {
   id          Int           @id @default(autoincrement())
-  workspaceId String?
+  workspaceId String
   name        String
   description String?
   icon        String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now())
-  workspace   Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   users       ProjectUser[]
   activities  Activity[]
 
@@ -121,10 +137,10 @@ model Project {
 model ProjectUser {
   id        Int     @id @default(autoincrement())
   projectId Int
-  userId    String
+  profileId String
   active    Boolean @default(true)
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("project_users")
 }

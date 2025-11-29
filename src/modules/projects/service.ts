@@ -12,13 +12,20 @@ import {
 export async function createProject(
   prisma: PrismaClient,
   input: CreateProjectInput,
-  workspaceId: string
+  workspaceId: string,
+  profileId: string
 ): Promise<ProjectResponse> {
   const project = await prisma.project.create({
     data: {
       ...input,
       icon: input.icon || "",
       workspaceId,
+      users: {
+        create: {
+          profileId,
+          active: true,
+        },
+      },
     },
   });
 
@@ -30,7 +37,7 @@ export async function createProject(
  */
 export async function getProjects(
   prisma: PrismaClient,
-  userId: string,
+  profileId: string,
   workspaceId: string,
   isAdmin: boolean
 ): Promise<ProjectResponse[]> {
@@ -38,7 +45,7 @@ export async function getProjects(
     prisma.project.findMany({
       where: {
         workspaceId,
-        users: isAdmin ? undefined : { some: { userId } },
+        users: isAdmin ? undefined : { some: { profileId } },
       },
       orderBy: { createdAt: "desc" },
       select: {
@@ -51,12 +58,16 @@ export async function getProjects(
         users: {
           where: { active: true },
           select: {
-            userId: true,
-            user: {
+            profileId: true,
+            profile: {
               select: {
                 id: true,
                 name: true,
-                email: true,
+                user: {
+                  select: {
+                    email: true,
+                  },
+                },
               },
             },
           },
@@ -73,7 +84,7 @@ export async function getProjects(
  */
 export async function getProject(
   prisma: PrismaClient,
-  userId: string,
+  profileId: string,
   workspaceId: string,
   isAdmin: boolean,
   id: number
@@ -89,12 +100,16 @@ export async function getProject(
       users: {
         where: { active: true },
         select: {
-          userId: true,
-          user: {
+          profileId: true,
+          profile: {
             select: {
               id: true,
               name: true,
-              email: true,
+              user: {
+                select: {
+                  email: true,
+                },
+              },
             },
           },
         },
@@ -102,7 +117,7 @@ export async function getProject(
     },
     where: isAdmin
       ? { id, workspaceId }
-      : { id, workspaceId, users: { some: { userId } } },
+      : { id, workspaceId, users: { some: { profileId } } },
   });
 
   return project;
@@ -150,31 +165,54 @@ export async function addUsersToProject(
   projectId: number,
   input: AddUsersToProjectInput
 ) {
+  // Get the project to check its workspaceId
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { workspaceId: true },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  // Verify all profiles belong to the same workspace
+  const profiles = await prisma.profile.findMany({
+    where: {
+      id: { in: input.profileIds },
+      workspaceId: project.workspaceId,
+    },
+    select: { id: true },
+  });
+
+  if (profiles.length !== input.profileIds.length) {
+    throw new Error("One or more profiles do not belong to the project's workspace");
+  }
+
   const existingRelations = await prisma.projectUser.findMany({
     where: {
       projectId,
-      userId: {
-        in: input.userIds,
+      profileId: {
+        in: input.profileIds,
       },
     },
-    select: { userId: true },
+    select: { profileId: true },
   });
 
   await prisma.$transaction(async (tx) => {
     // Check for existing project-user relationships
 
-    const existingUserIds = existingRelations.map((rel) => rel.userId);
-    const newUserIds = input.userIds.filter(
-      (id) => !existingUserIds.includes(id)
+    const existingProfileIds = existingRelations.map((rel) => rel.profileId);
+    const newProfileIds = input.profileIds.filter(
+      (id) => !existingProfileIds.includes(id)
     );
 
     // Reactivate existing users
-    if (existingUserIds.length > 0) {
+    if (existingProfileIds.length > 0) {
       await tx.projectUser.updateMany({
         where: {
           projectId,
-          userId: {
-            in: existingUserIds,
+          profileId: {
+            in: existingProfileIds,
           },
         },
         data: {
@@ -184,11 +222,11 @@ export async function addUsersToProject(
     }
 
     // Add new users to the project
-    if (newUserIds.length > 0) {
+    if (newProfileIds.length > 0) {
       await tx.projectUser.createMany({
-        data: newUserIds.map((userId) => ({
+        data: newProfileIds.map((profileId) => ({
           projectId,
-          userId,
+          profileId,
           active: true,
         })),
       });
@@ -202,14 +240,14 @@ export async function addUsersToProject(
 export async function deleteUsersFromProject(
   prisma: PrismaClient,
   projectId: number,
-  userId: string
+  profileId: string
 ) {
   // Delete users from the project
   await prisma.projectUser.updateMany({
     where: {
       projectId,
-      userId: {
-        in: [userId],
+      profileId: {
+        in: [profileId],
       },
     },
     data: {

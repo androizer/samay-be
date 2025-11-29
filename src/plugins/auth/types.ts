@@ -1,5 +1,6 @@
 export interface JWTPayload {
   userId: string;
-  role: string;
+  profileId: string;
   workspaceId: string;
+  role: string;
 }

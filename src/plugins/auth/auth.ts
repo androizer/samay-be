@@ -4,6 +4,7 @@ import { publicRoutes, isAdminRoute } from "./routes";
 import { validateToken } from "../../modules/auth/service";
 import { JWTPayload } from "./types";
 import { AppError, AuthorizationError } from "../error/plugin";
+import jwt from "jsonwebtoken";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -30,12 +31,13 @@ const authMiddleware: FastifyPluginAsync = fp(async (fastify) => {
     const user = await validateToken(token, fastify.prisma);
     if (!user) throw new AppError("JsonWebTokenError", 401);
 
-    // FIXME: Get workspaceId from session
+    const decoded = jwt.decode(token) as JWTPayload;
 
     const payload: JWTPayload = {
       userId: user.id,
-      role: user.role,
-      workspaceId: "",
+      profileId: decoded.profileId,
+      workspaceId: decoded.workspaceId,
+      role: decoded.role,
     };
 
     // Check admin routes access
