@@ -27,6 +27,7 @@ export interface AuthResponse {
   user: UserResponse;
   token: string;
   profiles: ProfileResponse[];
+  currentProfile: ProfileResponse;
 }
 
 export interface SwitchWorkspaceResponse {

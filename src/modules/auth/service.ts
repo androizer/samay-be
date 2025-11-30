@@ -91,6 +91,15 @@ export async function register(
         },
       },
     ],
+    currentProfile: {
+      id: profile.id,
+      workspaceId: workspace.id,
+      role: Role.ADMIN,
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+      },
+    },
   };
 }
 
@@ -180,6 +189,15 @@ export async function login(
         name: p.workspace.name,
       },
     })),
+    currentProfile: {
+      id: targetProfile.id,
+      workspaceId: targetProfile.workspaceId,
+      role: targetProfile.role,
+      workspace: {
+        id: targetProfile.workspace.id,
+        name: targetProfile.workspace.name,
+      },
+    },
   };
 }
 
