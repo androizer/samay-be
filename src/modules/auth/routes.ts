@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { LOGIN_SCHEMA, REGISTER_SCHEMA, GET_USER_BY_ID_SCHEMA } from "./schema";
+import { LOGIN_SCHEMA, REGISTER_SCHEMA, GET_USER_BY_ID_SCHEMA, SWITCH_WORKSPACE_SCHEMA } from "./schema";
 import {
   register,
   login,
@@ -7,6 +7,7 @@ import {
   getCurrentUser,
   getAllUsers,
   getUserById,
+  switchWorkspace,
 } from "./service";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 
@@ -56,6 +57,23 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         message: "Logged out successfully",
+      });
+    },
+  });
+
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "POST",
+    url: "/switch-workspace",
+    schema: {
+      body: SWITCH_WORKSPACE_SCHEMA,
+    },
+    handler: async (request, reply) => {
+      const { userId = "" } = request.user || {};
+      const input = request.body;
+      const result = await switchWorkspace(userId, input, prisma);
+
+      return reply.send({
+        data: result,
       });
     },
   });

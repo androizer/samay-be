@@ -28,6 +28,7 @@ const authMiddleware: FastifyPluginAsync = fp(async (fastify) => {
     const token = authHeader.split(" ")[1];
     if (!token) throw new AppError("JsonWebTokenError", 401);
 
+    // Stateless validation (DB check optional but good for security)
     const user = await validateToken(token, fastify.prisma);
     if (!user) throw new AppError("JsonWebTokenError", 401);
 

@@ -2,7 +2,7 @@ import { PrismaClient, User, Role } from "@prisma/client";
 import * as argon2 from "argon2";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
-import { AuthResponse, LoginInput, RegisterInput, UserResponse } from "./types";
+import { AuthResponse, LoginInput, RegisterInput, UserResponse, SwitchWorkspaceInput, SwitchWorkspaceResponse } from "./types";
 import { AppError } from "../../plugins/error/plugin";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -70,8 +70,7 @@ export async function register(
   // Generate JWT token
   const token = generateToken(user, profile.id, workspace.id, Role.ADMIN);
 
-  // Create session
-  await createSession(user.id, token, prisma);
+  // Session creation removed
 
   return {
     user: {
@@ -102,7 +101,7 @@ export async function login(
   input: LoginInput,
   prisma: PrismaClient
 ): Promise<AuthResponse> {
-  const { email, password } = input;
+  const { email, password, workspaceId } = input;
 
   // Find user
   const user = await prisma.user.findUnique({
@@ -149,15 +148,20 @@ export async function login(
     });
   }
 
-  // Determine target profile (default to first one)
-  // In a real app, client might send a preferred workspaceId, or we store last accessed
-  const targetProfile = profiles[0];
+  // Determine target profile
+  let targetProfile = profiles[0];
+
+  if (workspaceId) {
+    const requestedProfile = profiles.find(p => p.workspaceId === workspaceId);
+    if (requestedProfile) {
+      targetProfile = requestedProfile;
+    }
+  }
 
   // Generate JWT token
   const token = generateToken(user, targetProfile.id, targetProfile.workspaceId, targetProfile.role);
 
-  // Create session
-  await createSession(user.id, token, prisma);
+  // Session creation removed
 
   return {
     user: {
@@ -186,13 +190,56 @@ export async function logout(
   token: string,
   prisma: PrismaClient
 ): Promise<void> {
-  const deletedSessions = await prisma.session.deleteMany({
-    where: { token },
+  // Stateless logout (client-side only)
+  return;
+}
+
+/**
+ * Switch workspace
+ */
+export async function switchWorkspace(
+  userId: string,
+  input: SwitchWorkspaceInput,
+  prisma: PrismaClient
+): Promise<SwitchWorkspaceResponse> {
+  const { workspaceId } = input;
+
+  // Verify user is a member of the workspace
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+    include: {
+      workspace: true,
+    },
   });
 
-  if (deletedSessions.count === 0) {
-    throw new AppError("Invalid or expired token", 401, "INVALID_TOKEN");
+  if (!profile) {
+    throw new AppError("User is not a member of this workspace", 403, "FORBIDDEN");
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404, "USER_NOT_FOUND");
+  }
+
+  // Generate new token for the target workspace
+  const token = generateToken(user, profile.id, profile.workspaceId, profile.role);
+
+  return {
+    token,
+    workspace: {
+      id: profile.workspace.id,
+      name: profile.workspace.name,
+    },
+    role: profile.role,
+  };
 }
 
 /**
@@ -203,26 +250,14 @@ export async function validateToken(
   prisma: PrismaClient
 ): Promise<User | null> {
   try {
-    jwt.verify(token, JWT_SECRET) as { userId: string };
-
-    // Check if session exists and is not expired
-    const session = await prisma.session.findFirst({
-      where: {
-        token,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      include: {
-        user: true,
-      },
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    
+    // Check if user exists (optional for stateless, but good for security)
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
     });
 
-    if (!session) {
-      return null;
-    }
-
-    return session.user;
+    return user;
   } catch {
     return null;
   }
@@ -321,19 +356,4 @@ function generateToken(user: User, profileId: string, workspaceId: string, role:
 /**
  * Create session for user
  */
-async function createSession(
-  userId: string,
-  token: string,
-  prisma: PrismaClient
-): Promise<void> {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
-
-  await prisma.session.create({
-    data: {
-      userId,
-      token,
-      expiresAt,
-    },
-  });
-}
+// createSession removed
