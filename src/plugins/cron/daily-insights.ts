@@ -106,7 +106,7 @@ function formatActivitiesForPrompt(activities: TopActivityResponse[]): string {
 }
 
 async function getTopActivities(
-  userId: string,
+  profileId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -118,7 +118,7 @@ async function getTopActivities(
   const topActivities = await prisma.activity.groupBy({
     by: ["app", "title", "autoTags", "mergedTimestamp"],
     where: {
-      userId,
+      profileId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -143,13 +143,13 @@ async function getTopActivities(
  * Generate insights for a specific user for a given date range
  */
 async function generateUserInsights(
-  userId: string,
+  profileId: string,
   startDate: string,
   endDate: string,
   prisma: PrismaClient
 ) {
   const activities = await getTopActivities(
-    userId,
+    profileId,
     {
       startDate,
       endDate,
@@ -222,9 +222,9 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
   console.log("Starting daily insights task");
 
   try {
-    // Get all users
-    const users = await fastify.prisma.user.findMany();
-    console.log(`Found ${users.length} users to process`);
+    // Get all profiles
+    const profiles = await fastify.prisma.profile.findMany();
+    console.log(`Found ${profiles.length} profiles to process`);
 
     // Calculate yesterday's date range
     const now = new Date();
@@ -242,12 +242,12 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
 
     console.log(`Generating insights for period: ${startDate} to ${endDate}`);
 
-    for (const user of users) {
+    for (const profile of profiles) {
       try {
-        console.log(`Processing user ${user.id} (${user.email})`);
+        console.log(`Processing profile ${profile.id}`);
         
         const summary = await generateUserInsights(
-          user.id,
+          profile.id,
           startDate,
           endDate,
           fastify.prisma
@@ -265,8 +265,8 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
           // Save to database (upsert to override if exists)
           await fastify.prisma.dailyInsight.upsert({
             where: {
-              userId_date: {
-                userId: user.id,
+              profileId_date: {
+                profileId: profile.id,
                 date: normalizedDate,
               },
             },
@@ -275,7 +275,7 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
               improvementPlan: summary.improvementPlan,
             },
             create: {
-              userId: user.id,
+              profileId: profile.id,
               dailyInsights: summary.dailyInsights,
               improvementPlan: summary.improvementPlan,
               date: new Date(startDate),
@@ -285,8 +285,8 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
 
 
       } catch (err) {
-        console.error(`Error processing user ${user.id}:`, err);
-        // Continue with next user
+        console.error(`Error processing profile ${profile.id}:`, err);
+        // Continue with next profile
       }
     }
 
