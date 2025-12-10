@@ -73,7 +73,6 @@ export async function createActivity(
     .map((activity) => {
       const { data, timestamp, duration } = activity;
       const sanitizedData = sanitizeActivityData(data, tags);
-      console.log(sanitizedData);
       return {
         ...sanitizedData,
         timestamp,
@@ -82,7 +81,12 @@ export async function createActivity(
       };
     })
     .filter((activity) => {
-      return !EXCLUDED_APPS.includes(activity.app) && activity.duration > 0;
+      return (
+        !EXCLUDED_APPS.includes(activity.app) &&
+        activity.duration > 0 &&
+        activity.app &&
+        activity.title
+      );
     });
 
   await prisma.activity.createMany({
