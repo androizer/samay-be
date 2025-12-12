@@ -1,9 +1,14 @@
 import { FastifyPluginAsync } from "fastify";
-import { LOGIN_SCHEMA, REGISTER_SCHEMA, GET_USER_BY_ID_SCHEMA, SWITCH_WORKSPACE_SCHEMA } from "./schema";
+import {
+  LOGIN_SCHEMA,
+  REGISTER_SCHEMA,
+  GET_USER_BY_ID_SCHEMA,
+  SWITCH_WORKSPACE_SCHEMA,
+} from "./schema";
 import {
   register,
   login,
-  logout,
+  // logout,
   getCurrentUser,
   getAllUsers,
   getUserById,
@@ -49,20 +54,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "POST",
-    url: "/logout",
-    handler: async (request, reply) => {
-      const authHeader = request.headers.authorization || "";
-      const token = authHeader.split(" ")[1];
-      await logout(token, prisma);
-
-      return reply.send({
-        message: "Logged out successfully",
-      });
-    },
-  });
-
-  fastify.withTypeProvider<ZodTypeProvider>().route({
-    method: "POST",
     url: "/switch-workspace",
     schema: {
       body: SWITCH_WORKSPACE_SCHEMA,
@@ -82,8 +73,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/me",
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
-      const user = await getCurrentUser(userId, prisma);
+      const { profileId = "" } = request.user || {};
+      const user = await getCurrentUser(profileId, prisma);
       return reply.send({
         data: user,
       });
@@ -94,7 +85,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/users",
     handler: async (request, reply) => {
-      const users = await getAllUsers(prisma);
+      const { workspaceId = "" } = request.user || {};
+      const users = await getAllUsers(workspaceId, prisma);
       return reply.send({
         data: users,
       });
@@ -109,7 +101,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { id } = request.params;
-      const user = await getUserById(id, prisma);
+      const { workspaceId = "" } = request.user || {};
+      const user = await getUserById(id, workspaceId, prisma);
       return reply.send({
         data: user,
       });

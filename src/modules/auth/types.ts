@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { LOGIN_SCHEMA, REGISTER_SCHEMA, SWITCH_WORKSPACE_SCHEMA } from "./schema";
+import {
+  LOGIN_SCHEMA,
+  REGISTER_SCHEMA,
+  SWITCH_WORKSPACE_SCHEMA,
+} from "./schema";
 
 export type RegisterInput = z.infer<typeof REGISTER_SCHEMA>;
 export type LoginInput = z.infer<typeof LOGIN_SCHEMA>;
@@ -10,7 +14,9 @@ export interface UserResponse {
   id: string;
   email: string;
   name: string | null;
-  createdAt: Date;
+  profileId: string;
+  workspaceId: string;
+  role: string;
 }
 
 export interface ProfileResponse {
@@ -26,8 +32,6 @@ export interface ProfileResponse {
 export interface AuthResponse {
   user: UserResponse;
   token: string;
-  profiles: ProfileResponse[];
-  currentProfile: ProfileResponse;
 }
 
 export interface SwitchWorkspaceResponse {

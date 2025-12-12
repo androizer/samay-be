@@ -16,7 +16,6 @@ export const REGISTER_SCHEMA = z.object({
 export const LOGIN_SCHEMA = z.object({
   email: z.email("Invalid email format"),
   password: z.string().min(1, "Password is required"),
-  workspaceId: z.string().optional(),
 });
 
 export const SWITCH_WORKSPACE_SCHEMA = z.object({
