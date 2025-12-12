@@ -16,8 +16,7 @@ model Workspace {
   profiles  Profile[]
   projects  Project[]
   invitations Invitation[]
-
-  
+  isDefault Boolean @default(false)
   @@map("workspaces")
 }
 
