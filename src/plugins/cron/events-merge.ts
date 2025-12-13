@@ -16,7 +16,6 @@ interface AggregatedActivity {
   mergedTimestamp: string;
   autoTags: string;
   isAutoTagged: boolean;
-
 }
 
 // Helper function to convert timestamp to IST date string (YYYY-MM-DD)
@@ -58,7 +57,6 @@ const mergeActivities = (
       projectId = null,
       autoTags = "",
       isAutoTagged = false,
-
     } = activity;
 
     if (!profileId || !app || !title) {
@@ -97,7 +95,6 @@ const mergeActivities = (
         mergedTimestamp: mergedTimestamp || "",
         autoTags: autoTags || "",
         isAutoTagged,
-
       };
     }
   });
@@ -126,7 +123,7 @@ export const createEventsMergeJob = (fastify: FastifyInstance) => {
           projectId: true,
           autoTags: true,
           isAutoTagged: true,
-
+          url: true,
         },
       });
 
