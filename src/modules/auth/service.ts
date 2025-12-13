@@ -75,7 +75,7 @@ export async function register(
   const { user, workspace, profile } = result;
 
   const userWithProfile = {
-    id: user.id,
+    userId: user.id,
     email: user.email,
     name: name, // Return the name provided during registration
     createdAt: user.createdAt,
@@ -134,7 +134,7 @@ export async function login(
   });
 
   const userWithProfile = {
-    id: user.id,
+    userId: user.id,
     email: user.email,
     name,
     profileId: profileId,
@@ -205,7 +205,7 @@ export async function switchWorkspace(
   }
 
   const userWithProfile = {
-    id: user.id,
+    userId: user.id,
     email: user.email,
     name: profile.name,
     profileId: profile.id,
@@ -232,7 +232,7 @@ export async function validateToken(
 ): Promise<User | null> {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-
+    console.log("decoded", decoded);
     // Check if user exists (optional for stateless, but good for security)
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -264,7 +264,7 @@ export async function getCurrentUser(
   }
 
   const userWithProfile = {
-    id: profile.userId,
+    userId: profile.userId,
     name: profile.name,
     profileId: profile.id,
     workspaceId: profile.workspaceId,
@@ -291,7 +291,7 @@ export async function getAllUsers(
   });
 
   return users.map((profile) => ({
-    id: profile.userId,
+    userId: profile.userId,
     email: profile.user.email,
     name: profile.name,
     profileId: profile.id,
@@ -322,7 +322,7 @@ export async function getUserById(
   }
 
   const userWithProfile = {
-    id: profile.userId,
+    userId: profile.userId,
     email: profile.user.email,
     name: profile.name,
     profileId: profile.id,

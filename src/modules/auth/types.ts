@@ -11,7 +11,7 @@ export type SwitchWorkspaceInput = z.infer<typeof SWITCH_WORKSPACE_SCHEMA>;
 
 // User interface (partial of Prisma User)
 export interface UserResponse {
-  id: string;
+  userId: string;
   email: string;
   name: string | null;
   profileId: string;
