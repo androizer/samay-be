@@ -136,8 +136,9 @@ export async function deleteWorkspace(
     where: {
       workspaceId_userId: {
         workspaceId: id,
-        userId,
+        userId: userId,
       },
+      role: Role.ADMIN,
     },
   });
 
