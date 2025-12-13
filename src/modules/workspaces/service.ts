@@ -45,6 +45,8 @@ export async function createWorkspace(
     role: workspace.profiles[0].role,
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
+    isDefault: workspace.profiles[0].isDefault,
+    workspaceName: workspace.name,
   };
 }
 
@@ -60,7 +62,7 @@ export async function getWorkspaces(
     include: {
       workspace: true,
     },
-    orderBy: { joinedAt: "desc" },
+    orderBy: { id: "asc" },
   });
 
   return profiles.map((profile) => ({
@@ -69,6 +71,8 @@ export async function getWorkspaces(
     role: profile.role,
     createdAt: profile.workspace.createdAt,
     updatedAt: profile.workspace.updatedAt,
+    isDefault: profile.isDefault,
+    workspaceName: profile.workspace.name,
   }));
 }
 
@@ -121,6 +125,8 @@ export async function updateWorkspace(
     role: Role.ADMIN, // Only admins can update
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
+    isDefault: profile.isDefault,
+    workspaceName: workspace.name,
   };
 }
 

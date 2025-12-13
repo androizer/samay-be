@@ -4,6 +4,7 @@ import {
   REGISTER_SCHEMA,
   GET_USER_BY_ID_SCHEMA,
   SWITCH_WORKSPACE_SCHEMA,
+  MAKE_PROFILE_DEFAULT_SCHEMA,
 } from "./schema";
 import {
   register,
@@ -13,6 +14,7 @@ import {
   getAllUsers,
   getUserById,
   switchWorkspace,
+  makeProfileDefault,
 } from "./service";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 
@@ -105,6 +107,22 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const user = await getUserById(id, workspaceId, prisma);
       return reply.send({
         data: user,
+      });
+    },
+  });
+
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "POST",
+    url: "/make-profile-default",
+    schema: {
+      body: MAKE_PROFILE_DEFAULT_SCHEMA,
+    },
+    handler: async (request, reply) => {
+      const { userId = "" } = request.user || {};
+      const input = request.body;
+      await makeProfileDefault(userId, input, prisma);
+      return reply.status(200).send({
+        message: "Profile set as default successfully",
       });
     },
   });

@@ -8,6 +8,7 @@ import {
   RegisterInput,
   UserResponse,
   SwitchWorkspaceInput,
+  MakeProfileDefaultInput,
 } from "./types";
 import { AppError } from "../../plugins/error/plugin";
 
@@ -184,6 +185,7 @@ export async function switchWorkspace(
       },
     },
     include: {
+      user: true,
       workspace: true,
     },
   });
@@ -196,17 +198,9 @@ export async function switchWorkspace(
     );
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    throw new AppError("User not found", 404, "USER_NOT_FOUND");
-  }
-
   const userWithProfile = {
-    userId: user.id,
-    email: user.email,
+    userId: profile.user.id,
+    email: profile.user.email,
     name: profile.name,
     profileId: profile.id,
     workspaceId: profile.workspaceId,
@@ -347,6 +341,52 @@ function generateToken(user: UserResponse): string {
 
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
+  });
+}
+
+/**
+ * Make a profile default for a user
+ */
+export async function makeProfileDefault(
+  userId: string,
+  input: MakeProfileDefaultInput,
+  prisma: PrismaClient
+): Promise<void> {
+  const { workspaceId } = input;
+
+  // Verify the profile exists and belongs to the user
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+  });
+
+  if (!profile) {
+    throw new AppError("Profile not found", 404, "PROFILE_NOT_FOUND");
+  }
+
+  // Update all profiles for this user: set isDefault to false
+  // Then set the specified profile to isDefault: true
+  await prisma.$transaction(async (tx) => {
+    // Set all profiles for this user to isDefault: false
+    await tx.profile.updateMany({
+      where: { userId },
+      data: { isDefault: false },
+    });
+
+    // Set the specified profile to isDefault: true
+    await tx.profile.update({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId,
+        },
+      },
+      data: { isDefault: true },
+    });
   });
 }
 
