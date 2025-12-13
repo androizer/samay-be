@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import {
   CreateInvitationInput,
   AcceptInvitationInput,
@@ -17,7 +17,7 @@ export async function createInvitation(
   inviterId: string,
   workspaceId: string
 ): Promise<InvitationResponse> {
-  const { email, role } = input;
+  const { email, role = "USER" } = input;
 
   // Check if user is already a member of the workspace
   const existingMember = await prisma.profile.findFirst({
@@ -56,29 +56,31 @@ export async function createInvitation(
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
 
-  const invitation = await prisma.invitation.create({
-    data: {
-      email,
-      role,
-      workspaceId,
-      inviterId,
-      token,
-      expiresAt,
-    },
-    include: {
-      inviter: {
-        select: {
-          name: true,
-          email: true,
+  const invitation = await prisma.invitation
+    .create({
+      data: {
+        email,
+        role,
+        workspaceId,
+        inviterId,
+        token,
+        expiresAt,
+      },
+      include: {
+        inviter: {
+          select: {
+            name: true,
+            email: true,
+          },
         },
       },
-    },
-  }).catch((e) => {
-    if (e.code === 'P2002') {
-       throw new Error("Invitation already exists");
-    }
-    throw e;
-  });
+    })
+    .catch((e) => {
+      if (e.code === "P2002") {
+        throw new Error("Invitation already exists");
+      }
+      throw e;
+    });
 
   // TODO: Send email
   // TODO: Send email
@@ -149,7 +151,10 @@ export async function acceptInvitation(
       where: { id: invitation.id },
     });
 
-    return { message: "Invitation accepted successfully", workspaceId: invitation.workspaceId };
+    return {
+      message: "Invitation accepted successfully",
+      workspaceId: invitation.workspaceId,
+    };
   });
 }
 

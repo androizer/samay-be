@@ -163,29 +163,16 @@ export async function deleteProject(
 export async function addUsersToProject(
   prisma: PrismaClient,
   projectId: number,
+  workspaceId: string,
   input: AddUsersToProjectInput
 ) {
   // Get the project to check its workspaceId
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { workspaceId: true },
+    where: { id: projectId, workspaceId },
   });
 
   if (!project) {
     throw new Error("Project not found");
-  }
-
-  // Verify all profiles belong to the same workspace
-  const profiles = await prisma.profile.findMany({
-    where: {
-      id: { in: input.profileIds },
-      workspaceId: project.workspaceId,
-    },
-    select: { id: true },
-  });
-
-  if (profiles.length !== input.profileIds.length) {
-    throw new Error("One or more profiles do not belong to the project's workspace");
   }
 
   const existingRelations = await prisma.projectUser.findMany({
@@ -240,14 +227,16 @@ export async function addUsersToProject(
 export async function deleteUsersFromProject(
   prisma: PrismaClient,
   projectId: number,
-  profileId: string
+  profileId: string,
+  workspaceId: string
 ) {
   // Delete users from the project
   await prisma.projectUser.updateMany({
     where: {
       projectId,
-      profileId: {
-        in: [profileId],
+      profileId,
+      profile: {
+        workspaceId,
       },
     },
     data: {

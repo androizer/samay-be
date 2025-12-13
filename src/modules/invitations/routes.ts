@@ -25,14 +25,6 @@ const invitationRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { userId = "", workspaceId = "" } = request.user || {};
-      // TODO: Check if user is admin of workspace.
-      // Assuming middleware checks role or we check here.
-      // request.user.role is global role? No, it's profile role from token.
-      
-      const { role } = request.user || {};
-      if (role !== "ADMIN") {
-        return reply.status(403).send({ message: "Only admins can invite users" });
-      }
 
       const input = request.body;
       const result = await createInvitation(prisma, input, userId, workspaceId);
@@ -70,11 +62,7 @@ const invitationRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: INVITATION_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { workspaceId = "", role } = request.user || {};
-      
-      if (role !== "ADMIN") {
-        return reply.status(403).send({ message: "Only admins can view invitations" });
-      }
+      const { workspaceId = "" } = request.user || {};
 
       const query = request.query;
       const result = await getPendingInvitations(prisma, workspaceId, query);
@@ -95,11 +83,7 @@ const invitationRoutes: FastifyPluginAsync = async (fastify) => {
       }),
     },
     handler: async (request, reply) => {
-      const { workspaceId = "", role } = request.user || {};
-
-      if (role !== "ADMIN") {
-        return reply.status(403).send({ message: "Only admins can delete invitations" });
-      }
+      const { workspaceId = "" } = request.user || {};
 
       const { id } = request.params;
       await deleteInvitation(prisma, id, workspaceId);

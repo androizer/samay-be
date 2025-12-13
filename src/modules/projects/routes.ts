@@ -44,8 +44,17 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/",
     handler: async (request, reply) => {
-      const { profileId = "", role = "", workspaceId = "" } = request.user || {};
-      const result = await getProjects(prisma, profileId, workspaceId, role == "ADMIN");
+      const {
+        profileId = "",
+        role = "",
+        workspaceId = "",
+      } = request.user || {};
+      const result = await getProjects(
+        prisma,
+        profileId,
+        workspaceId,
+        role == "ADMIN"
+      );
 
       return reply.send({
         data: result,
@@ -61,7 +70,11 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       params: PROJECT_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { profileId = "", role = "", workspaceId = "" } = request.user || {};
+      const {
+        profileId = "",
+        role = "",
+        workspaceId = "",
+      } = request.user || {};
       const { id } = request.params;
       const projectId = parseInt(id);
 
@@ -133,8 +146,9 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params;
       const projectId = parseInt(id);
       const input = request.body;
+      const { workspaceId = "" } = request.user || {};
 
-      await addUsersToProject(prisma, projectId, input);
+      await addUsersToProject(prisma, projectId, workspaceId, input);
       return reply.send({
         message: "Users added to project successfully",
       });
@@ -151,8 +165,9 @@ const projectRoutes: FastifyPluginAsync = async (fastify) => {
     handler: async (request, reply) => {
       const { id, profileId } = request.params;
       const projectId = parseInt(id);
+      const { workspaceId = "" } = request.user || {};
 
-      await deleteUsersFromProject(prisma, projectId, profileId);
+      await deleteUsersFromProject(prisma, projectId, profileId, workspaceId);
       return reply.send({
         message: "Users removed from project successfully",
       });
