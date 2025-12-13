@@ -58,11 +58,7 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { id } = request.params;
-      const { userId = "", role } = request.user || {};
-
-      if (role !== "ADMIN") {
-        return reply.status(403).send({ message: "Only admins can update workspaces" });
-      }
+      const { userId = "" } = request.user || {};
 
       const input = request.body;
       const result = await updateWorkspace(prisma, id, input, userId);
@@ -83,13 +79,8 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user || {};
-
-      if (role !== "ADMIN") {
-        return reply.status(403).send({ message: "Only admins can delete workspaces" });
-      }
-
-      await deleteWorkspace(prisma, id);
+      const { userId = "" } = request.user || {};
+      await deleteWorkspace(prisma, id, userId);
 
       return reply.send({
         message: "Workspace deleted successfully",

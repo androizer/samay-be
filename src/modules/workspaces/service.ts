@@ -4,6 +4,7 @@ import {
   UpdateWorkspaceInput,
   WorkspaceResponse,
 } from "./types";
+import { AppError } from "../../plugins/error/plugin";
 
 /**
  * Create a new workspace
@@ -87,11 +88,16 @@ export async function updateWorkspace(
         workspaceId: id,
         userId,
       },
+      role: Role.ADMIN,
     },
   });
 
-  if (!profile || profile.role !== Role.ADMIN) {
-    throw new Error("Only admins can update workspaces");
+  if (!profile) {
+    throw new AppError(
+      "You are not authorized to update this workspace",
+      403,
+      "FORBIDDEN"
+    );
   }
 
   const workspace = await prisma.workspace.update({
@@ -108,7 +114,7 @@ export async function updateWorkspace(
   // For simplicity, we might need to change return type or fetch profile.
   // But wait, the response type requires role.
   // Let's assume the user updating is ADMIN.
-  
+
   return {
     id: workspace.id,
     name: workspace.name,
@@ -123,8 +129,26 @@ export async function updateWorkspace(
  */
 export async function deleteWorkspace(
   prisma: PrismaClient,
-  id: string
+  id: string,
+  userId: string
 ): Promise<void> {
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId: id,
+        userId,
+      },
+    },
+  });
+
+  if (!profile) {
+    throw new AppError(
+      "You are not authorized to delete this workspace",
+      403,
+      "FORBIDDEN"
+    );
+  }
+
   await prisma.workspace.delete({
     where: { id },
   });
