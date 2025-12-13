@@ -16,7 +16,6 @@ model Workspace {
   profiles  Profile[]
   projects  Project[]
   invitations Invitation[]
-  isDefault Boolean @default(false)
   @@map("workspaces")
 }
 
@@ -49,7 +48,7 @@ model Profile {
   activities  Activity[]
   projectUsers ProjectUser[]
   dailyInsights DailyInsight[]
-
+  isDefault Boolean @default(false)
   @@unique([workspaceId, userId])
   @@map("profiles")
 }

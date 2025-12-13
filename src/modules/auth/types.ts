@@ -16,29 +16,11 @@ export interface UserResponse {
   name: string | null;
   profileId: string;
   workspaceId: string;
+  workspaceName: string;
   role: string;
-}
-
-export interface ProfileResponse {
-  id: string;
-  workspaceId: string;
-  role: string;
-  workspace: {
-    id: string;
-    name: string;
-  };
 }
 
 export interface AuthResponse {
   user: UserResponse;
   token: string;
-}
-
-export interface SwitchWorkspaceResponse {
-  token: string;
-  workspace: {
-    id: string;
-    name: string;
-  };
-  role: string;
 }

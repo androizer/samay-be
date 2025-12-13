@@ -58,6 +58,7 @@ export async function register(
             userId: user.id,
             name: name,
             role: Role.ADMIN,
+            isDefault: true,
           },
         },
       },
@@ -81,6 +82,7 @@ export async function register(
     profileId: profile.id,
     workspaceId: workspace.id,
     role: profile.role,
+    workspaceName: workspace.name,
   };
 
   // Generate JWT token
@@ -122,11 +124,12 @@ export async function login(
   // Get user's profiles
   const {
     id: profileId,
-    workspace: { id: workspaceId },
+    workspaceId: workspaceId,
+    workspace: { name: workspaceName },
     role,
     name,
   } = await prisma.profile.findFirstOrThrow({
-    where: { userId: user.id, workspace: { isDefault: true } },
+    where: { userId: user.id, isDefault: true },
     include: { workspace: true },
   });
 
@@ -137,6 +140,7 @@ export async function login(
     profileId: profileId,
     workspaceId: workspaceId,
     role: role,
+    workspaceName: workspaceName,
   };
 
   // Generate JWT token
@@ -207,6 +211,7 @@ export async function switchWorkspace(
     profileId: profile.id,
     workspaceId: profile.workspaceId,
     role: profile.role,
+    workspaceName: profile.workspace.name,
   };
 
   // Generate new token for the target workspace
@@ -250,6 +255,7 @@ export async function getCurrentUser(
     where: { id: profileId },
     include: {
       user: true,
+      workspace: true,
     },
   });
 
@@ -264,6 +270,7 @@ export async function getCurrentUser(
     workspaceId: profile.workspaceId,
     role: profile.role,
     email: profile.user.email,
+    workspaceName: profile.workspace.name,
   };
   return userWithProfile;
 }
@@ -279,6 +286,7 @@ export async function getAllUsers(
     where: { workspaceId },
     include: {
       user: true,
+      workspace: true,
     },
   });
 
@@ -289,6 +297,7 @@ export async function getAllUsers(
     profileId: profile.id,
     workspaceId: profile.workspaceId,
     role: profile.role,
+    workspaceName: profile.workspace.name,
   }));
 }
 
@@ -304,6 +313,7 @@ export async function getUserById(
     where: { id: profileId, workspaceId },
     include: {
       user: true,
+      workspace: true,
     },
   });
 
@@ -318,6 +328,7 @@ export async function getUserById(
     profileId: profile.id,
     workspaceId: profile.workspaceId,
     role: profile.role,
+    workspaceName: profile.workspace.name,
   };
   return userWithProfile;
 }
