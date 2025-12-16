@@ -3,6 +3,7 @@ import fastifySwagger from "@fastify/swagger";
 import cors from "@fastify/cors";
 import fastifySwaggerUI from "@fastify/swagger-ui";
 import fastifySchedule from "@fastify/schedule";
+import rateLimit from "@fastify/rate-limit";
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -31,6 +32,10 @@ app.register(cors, {
 app.register(prismaPlugin);
 app.register(errorHandlerPlugin);
 app.register(fastifySchedule);
+app.register(rateLimit, {
+  max: 100,
+  timeWindow: "1 minute",
+});
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
 

@@ -10,6 +10,7 @@ export interface UserResponse {
   email: string;
   name: string | null;
   role: string;
+  emailVerified: boolean;
   createdAt: Date;
 }
 
