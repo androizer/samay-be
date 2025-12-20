@@ -29,6 +29,15 @@ const authMiddleware: FastifyPluginAsync = fp(async (fastify) => {
 
     const decoded = jwt.decode(token) as JWTPayload;
 
+    if (
+      !decoded ||
+      !decoded.userId ||
+      !decoded.profileId ||
+      !decoded.workspaceId
+    ) {
+      throw new AppError("JsonWebTokenError", 401);
+    }
+
     // Check admin routes access
     if (decoded.role != "ADMIN") {
       if (isAdminRoute(method, url)) {
