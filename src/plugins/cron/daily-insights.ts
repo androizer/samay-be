@@ -338,9 +338,9 @@ export const createDailyInsightsJob = (fastify: FastifyInstance) => {
   const taskFunction = () => executeDailyInsightsTask(fastify);
 
   // Run immediately
-  taskFunction().catch((err) => {
-    console.error("Immediate daily insights task error:", err);
-  });
+  // taskFunction().catch((err) => {
+  //   console.error("Immediate daily insights task error:", err);
+  // });
 
   const task = new AsyncTask(
     "daily insights task",

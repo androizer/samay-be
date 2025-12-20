@@ -245,34 +245,20 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
   // Get user select data by user ID
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "GET",
-    url: "/user-select/:userId",
+    url: "/user-select/:profileId",
     schema: {
       params: z.object({
-        userId: z.string().min(1, "User ID is required"),
+        profileId: z.string().min(1, "Profile ID is required"),
       }),
       querystring: USER_SELECT_DATA_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId } = request.params;
-      const { workspaceId = "" } = request.user || {}; 
-      
-      const profile = await prisma.profile.findUnique({
-        where: {
-          workspaceId_userId: {
-            workspaceId,
-            userId,
-          },
-        },
-      });
-
-      if (!profile) {
-        return reply.status(404).send({ message: "User not found in workspace" });
-      }
+      const { profileId } = request.params;
 
       const { startDate, endDate } = request.query;
 
       const result = await getUserSelectData(
-        profile.id,
+        profileId,
         { startDate, endDate },
         prisma
       );
