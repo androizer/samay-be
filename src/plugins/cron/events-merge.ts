@@ -4,7 +4,7 @@ import { Activity } from "@prisma/client";
 
 // Interface for the aggregated result
 interface AggregatedActivity {
-  userId: string;
+  profileId: string;
   app: string;
   title: string;
   selected: boolean;
@@ -46,7 +46,7 @@ const mergeActivities = (
   const allIds: string[] = [];
   activities.forEach((activity) => {
     const {
-      userId = "",
+      profileId = "",
       app = "",
       title = "",
       selected = false,
@@ -59,12 +59,12 @@ const mergeActivities = (
       isAutoTagged = false,
     } = activity;
 
-    if (!userId || !app || !title) {
+    if (!profileId || !app || !title) {
       return { activities: [], allIds: [] };
     }
 
     const istDate = getISTDate(timestamp);
-    const key = `${userId}|${app}|${title}|${selected}|${istDate}`;
+    const key = `${profileId}|${app}|${title}|${selected}|${istDate}`;
     allIds.push(id);
 
     const mergedTimestamp =
@@ -83,7 +83,7 @@ const mergeActivities = (
     } else {
       // Create new group
       groupedData[key] = {
-        userId,
+        profileId,
         app,
         title,
         selected,
@@ -114,7 +114,7 @@ export const createEventsMergeJob = (fastify: FastifyInstance) => {
         },
         select: {
           id: true,
-          userId: true,
+          profileId: true,
           app: true,
           title: true,
           selected: true,
@@ -123,6 +123,7 @@ export const createEventsMergeJob = (fastify: FastifyInstance) => {
           projectId: true,
           autoTags: true,
           isAutoTagged: true,
+          url: true,
         },
       });
 

@@ -7,78 +7,114 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  password     String
-  name         String
-  role         Role          @default(USER)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  activities   Activity[]
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  profiles  Profile[]
+  projects  Project[]
+  invitations Invitation[]
+  @@map("workspaces")
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  workspaceId String
+  role        Role      @default(USER)
+  token       String    @unique
+  expiresAt   DateTime
+  inviterId   String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter     User      @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([email, workspaceId])
+  @@map("invitations")
+}
+
+model Profile {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  name               String
+  role        Role      @default(USER)
+  joinedAt    DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified         Boolean           @default(false)
+  activities  Activity[]
   projectUsers ProjectUser[]
-  sessions     Session[]
   dailyInsights DailyInsight[]
+  isDefault Boolean @default(false)
+  @@unique([workspaceId, userId])
+  @@map("profiles")
+}
+
+
+model User {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  password           String
+  name               String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  profiles           Profile[]
+  invitations        Invitation[]
 
   @@map("users")
 }
 
 model DailyInsight {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  dailyInsights   Json     // Stored as JSONB
-  improvementPlan Json     // Stored as JSONB
-  date            DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String    @id @default(cuid())
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dailyInsights   Json      // Stored as JSONB
+  improvementPlan Json      // Stored as JSONB
+  date            DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  @@unique([userId, date])
-  @@index([userId, date])
+  @@unique([profileId, date])
+  @@index([profileId, date])
   @@map("daily_insights")
 }
 
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
-}
 
 model Activity {
-  id          String   @id @default(cuid())
-  userId      String
-  app         String
-  url         String
-  title       String
-  description String?
-  timestamp   String
+  id              String     @id @default(cuid())
+  profileId       String
+  app             String
+  url             String
+  title           String
+  description     String?
+  timestamp       String
   mergedTimestamp String?
-  duration    Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  merged      Boolean  @default(false)
-  selected    Boolean  @default(false)
-  projectId   Int?
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  autoTags    String?
-  isAutoTagged Boolean @default(false)
+  duration        Int?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  merged          Boolean    @default(false)
+  selected        Boolean    @default(false)
+  projectId       Int?
+  profile         Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  project         Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  autoTags        String?
+  isAutoTagged    Boolean    @default(false)
   @@map("activities")
 }
 
 model Project {
   id          Int           @id @default(autoincrement())
+  workspaceId String
   name        String
   description String?
   icon        String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now())
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   users       ProjectUser[]
   activities  Activity[]
 
@@ -88,22 +124,22 @@ model Project {
 model ProjectUser {
   id        Int     @id @default(autoincrement())
   projectId Int
-  userId    String
+  profileId String
   active    Boolean @default(true)
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("project_users")
 }
 
 
 model Tag {
-  id          Int           @id @default(autoincrement())
-  app        String
-  title String
-  tag     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  app         String
+  title       String
+  tag         String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   @@map("tags")
 }
 

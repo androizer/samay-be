@@ -1,7 +1,15 @@
-import { PrismaClient, User } from "@prisma/client";
+import { PrismaClient, User, Role } from "@prisma/client";
 import * as argon2 from "argon2";
+import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
-import { AuthResponse, LoginInput, RegisterInput, UserResponse } from "./types";
+import {
+  AuthResponse,
+  LoginInput,
+  RegisterInput,
+  UserResponse,
+  SwitchWorkspaceInput,
+  MakeProfileDefaultInput,
+} from "./types";
 import { AppError } from "../../plugins/error/plugin";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -32,32 +40,59 @@ export async function register(
   // Hash password
   const hashedPassword = await argon2.hash(password);
 
-  // Create user
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      name,
-    },
+  // Create user and default workspace in transaction
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+      },
+    });
+
+    const workspace = await tx.workspace.create({
+      data: {
+        name: `${name}'s Workspace`,
+        ownerId: user.id,
+        profiles: {
+          create: {
+            userId: user.id,
+            name: name,
+            role: Role.ADMIN,
+            isDefault: true,
+          },
+        },
+      },
+    });
+
+    // Fetch the created profile
+    const profile = await tx.profile.findFirstOrThrow({
+      where: { workspaceId: workspace.id, userId: user.id },
+    });
+
+    return { user, workspace, profile };
   });
 
+  const { user, workspace, profile } = result;
+
+  const userWithProfile = {
+    userId: user.id,
+    email: user.email,
+    name: name, // Return the name provided during registration
+    createdAt: user.createdAt,
+    profileId: profile.id,
+    workspaceId: workspace.id,
+    role: profile.role,
+    workspaceName: workspace.name,
+  };
+
   // Generate JWT token
-  const token = generateToken(user);
+  const token = generateToken(userWithProfile);
 
-  // Create session
-  await createSession(user.id, token, prisma);
-
-  // Destructure user object for response
-  const { id, role, createdAt } = user;
+  // Session creation removed
 
   return {
-    user: {
-      id,
-      email,
-      name,
-      role,
-      createdAt,
-    },
+    user: userWithProfile,
     token,
   };
 }
@@ -87,29 +122,35 @@ export async function login(
     throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
-  // Generate JWT token
-  const token = generateToken(user);
-
-  // Create session
-  await createSession(user.id, token, prisma);
-
-  // Destructure user object for response
+  // Get user's profiles
   const {
-    id,
-    email: userEmail,
-    name: userName,
-    role: userRole,
-    createdAt,
-  } = user;
+    id: profileId,
+    workspaceId: workspaceId,
+    workspace: { name: workspaceName },
+    role,
+    name,
+  } = await prisma.profile.findFirstOrThrow({
+    where: { userId: user.id, isDefault: true },
+    include: { workspace: true },
+  });
+
+  const userWithProfile = {
+    userId: user.id,
+    email: user.email,
+    name,
+    profileId: profileId,
+    workspaceId: workspaceId,
+    role: role,
+    workspaceName: workspaceName,
+  };
+
+  // Generate JWT token
+  const token = generateToken(userWithProfile);
+
+  // Session creation removed
 
   return {
-    user: {
-      id,
-      email: userEmail,
-      name: userName,
-      role: userRole,
-      createdAt,
-    },
+    user: userWithProfile,
     token,
   };
 }
@@ -117,17 +158,63 @@ export async function login(
 /**
  * Logout user by invalidating session
  */
-export async function logout(
-  token: string,
+// export async function logout(
+//   token: string,
+//   prisma: PrismaClient
+// ): Promise<void> {
+//   // Stateless logout (client-side only)
+//   return;
+// }
+
+/**
+ * Switch workspace
+ */
+export async function switchWorkspace(
+  userId: string,
+  input: SwitchWorkspaceInput,
   prisma: PrismaClient
-): Promise<void> {
-  const deletedSessions = await prisma.session.deleteMany({
-    where: { token },
+): Promise<AuthResponse> {
+  const { workspaceId } = input;
+
+  // Verify user is a member of the workspace
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+    include: {
+      user: true,
+      workspace: true,
+    },
   });
 
-  if (deletedSessions.count === 0) {
-    throw new AppError("Invalid or expired token", 401, "INVALID_TOKEN");
+  if (!profile) {
+    throw new AppError(
+      "User is not a member of this workspace",
+      403,
+      "FORBIDDEN"
+    );
   }
+
+  const userWithProfile = {
+    userId: profile.user.id,
+    email: profile.user.email,
+    name: profile.name,
+    profileId: profile.id,
+    workspaceId: profile.workspaceId,
+    role: profile.role,
+    workspaceName: profile.workspace.name,
+  };
+
+  // Generate new token for the target workspace
+  const token = generateToken(userWithProfile);
+
+  return {
+    token,
+    user: userWithProfile,
+  };
 }
 
 /**
@@ -138,26 +225,14 @@ export async function validateToken(
   prisma: PrismaClient
 ): Promise<User | null> {
   try {
-    jwt.verify(token, JWT_SECRET) as { userId: string };
-
-    // Check if session exists and is not expired
-    const session = await prisma.session.findFirst({
-      where: {
-        token,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      include: {
-        user: true,
-      },
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    console.log("decoded", decoded);
+    // Check if user exists (optional for stateless, but good for security)
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
     });
 
-    if (!session) {
-      return null;
-    }
-
-    return session.user;
+    return user;
   } catch {
     return null;
   }
@@ -167,81 +242,101 @@ export async function validateToken(
  * Get current user profile
  */
 export async function getCurrentUser(
-  userId: string,
+  profileId: string,
   prisma: PrismaClient
 ): Promise<UserResponse> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
+  const profile = await prisma.profile.findUnique({
+    where: { id: profileId },
+    include: {
+      user: true,
+      workspace: true,
     },
   });
 
-  if (!user) {
+  if (!profile) {
     throw new AppError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  return user;
+  const userWithProfile = {
+    userId: profile.userId,
+    name: profile.name,
+    profileId: profile.id,
+    workspaceId: profile.workspaceId,
+    role: profile.role,
+    email: profile.user.email,
+    workspaceName: profile.workspace.name,
+  };
+  return userWithProfile;
 }
 
 /**
  * Get all users (admin only)
  */
 export async function getAllUsers(
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<UserResponse[]> {
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
-    },
-    orderBy: {
-      createdAt: "desc",
+  const users = await prisma.profile.findMany({
+    where: { workspaceId },
+    include: {
+      user: true,
+      workspace: true,
     },
   });
 
-  return users;
+  return users.map((profile) => ({
+    userId: profile.userId,
+    email: profile.user.email,
+    name: profile.name,
+    profileId: profile.id,
+    workspaceId: profile.workspaceId,
+    role: profile.role,
+    workspaceName: profile.workspace.name,
+  }));
 }
 
 /**
  * Get user by ID
  */
 export async function getUserById(
-  userId: string,
+  profileId: string,
+  workspaceId: string,
   prisma: PrismaClient
 ): Promise<UserResponse> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
+  const profile = await prisma.profile.findUnique({
+    where: { id: profileId, workspaceId },
+    include: {
+      user: true,
+      workspace: true,
     },
   });
 
-  if (!user) {
+  if (!profile) {
     throw new AppError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  return user;
+  const userWithProfile = {
+    userId: profile.userId,
+    email: profile.user.email,
+    name: profile.name,
+    profileId: profile.id,
+    workspaceId: profile.workspaceId,
+    role: profile.role,
+    workspaceName: profile.workspace.name,
+  };
+  return userWithProfile;
 }
 
 /**
  * Generate JWT token
  */
-function generateToken(user: User): string {
+/**
+ * Generate JWT token
+ */
+function generateToken(user: UserResponse): string {
   const payload = {
-    userId: user.id,
-    role: user.role,
+    ...user,
+    jti: randomUUID(),
   };
 
   return jwt.sign(payload, JWT_SECRET, {
@@ -250,21 +345,52 @@ function generateToken(user: User): string {
 }
 
 /**
- * Create session for user
+ * Make a profile default for a user
  */
-async function createSession(
+export async function makeProfileDefault(
   userId: string,
-  token: string,
+  input: MakeProfileDefaultInput,
   prisma: PrismaClient
 ): Promise<void> {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+  const { workspaceId } = input;
 
-  await prisma.session.create({
-    data: {
-      userId,
-      token,
-      expiresAt,
+  // Verify the profile exists and belongs to the user
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
     },
   });
+
+  if (!profile) {
+    throw new AppError("Profile not found", 404, "PROFILE_NOT_FOUND");
+  }
+
+  // Update all profiles for this user: set isDefault to false
+  // Then set the specified profile to isDefault: true
+  await prisma.$transaction(async (tx) => {
+    // Set all profiles for this user to isDefault: false
+    await tx.profile.updateMany({
+      where: { userId },
+      data: { isDefault: false },
+    });
+
+    // Set the specified profile to isDefault: true
+    await tx.profile.update({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId,
+        },
+      },
+      data: { isDefault: true },
+    });
+  });
 }
+
+/**
+ * Create session for user
+ */
+// createSession removed

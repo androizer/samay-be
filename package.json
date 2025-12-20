@@ -12,6 +12,7 @@
     "db:users": "node scripts/db-query.js users",
     "db:sessions": "node scripts/db-query.js sessions",
     "db:count": "node scripts/db-query.js count",
+    "migrate:workspaces": "npx ts-node scripts/migrate-to-workspaces.ts",
     "studio": "npx prisma studio"
   },
   "prisma": {

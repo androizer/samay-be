@@ -24,11 +24,13 @@ export interface ProjectResponse {
   createdAt: Date;
   updatedAt: Date;
   users?: {
-    userId: string;
-    user: {
+    profileId: string;
+    profile: {
       id: string;
       name: string;
-      email: string;
+      user: {
+        email: string;
+      };
     };
   }[];
 }
