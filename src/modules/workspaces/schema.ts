@@ -18,6 +18,10 @@ export const DELETE_USER_PARAM_SCHEMA = z.object({
   id: z.string().min(1, "Workspace ID is required"),
 });
 
+export const UPDATE_USER_ROLE_SCHEMA = z.object({
+  role: z.nativeEnum(Role),
+});
+
 // Invitation schemas
 export const CREATE_INVITATION_SCHEMA = z.object({
   email: z.email("Invalid email address"),

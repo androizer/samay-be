@@ -4,6 +4,7 @@ import {
   UpdateWorkspaceInput,
   WorkspaceResponse,
   DeleteUserInput,
+  UpdateUserRoleInput,
   CreateInvitationInput,
   AcceptInvitationInput,
   InvitationResponse,
@@ -549,6 +550,105 @@ export async function deleteUserFromWorkspace(
       },
     },
   });
+}
+
+/**
+ * Update a user's role in a workspace (admin only)
+ */
+export async function updateUserRoleInWorkspace(
+  prisma: PrismaClient,
+  workspaceId: string,
+  targetUserId: string,
+  input: UpdateUserRoleInput,
+  adminId: string,
+): Promise<WorkspaceUserResponse> {
+  const { role } = input;
+
+  // Verify requester is admin of the workspace
+  const adminProfile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId: adminId,
+      },
+      role: Role.ADMIN,
+    },
+  });
+
+  if (!adminProfile) {
+    throw new AppError(
+      "You are not authorized to update users in this workspace",
+      403,
+      "FORBIDDEN",
+    );
+  }
+
+  // Prevent admin from changing their own role
+  if (targetUserId === adminId) {
+    throw new AppError(
+      "You cannot change your own role in the workspace",
+      400,
+      "BAD_REQUEST",
+    );
+  }
+
+  // Check if target user exists in the workspace
+  const userProfile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId: targetUserId,
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!userProfile) {
+    throw new AppError(
+      "User is not a member of this workspace",
+      404,
+      "NOT_FOUND",
+    );
+  }
+
+  // Update the user's role
+  const updatedProfile = await prisma.profile.update({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId: targetUserId,
+      },
+    },
+    data: {
+      role,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  return {
+    id: updatedProfile.id,
+    userId: updatedProfile.userId,
+    name: updatedProfile.name,
+    email: updatedProfile.user.email,
+    role: updatedProfile.role,
+    joinedAt: updatedProfile.joinedAt,
+    isDefault: updatedProfile.isDefault,
+    isVerified: updatedProfile.isVerified,
+  };
 }
 
 /**

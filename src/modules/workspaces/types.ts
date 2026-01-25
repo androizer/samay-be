@@ -6,11 +6,13 @@ import {
   CREATE_INVITATION_SCHEMA,
   ACCEPT_INVITATION_SCHEMA,
   INVITATION_QUERY_SCHEMA,
+  UPDATE_USER_ROLE_SCHEMA,
 } from "./schema";
 
 export type CreateWorkspaceInput = z.infer<typeof CREATE_WORKSPACE_SCHEMA>;
 export type UpdateWorkspaceInput = z.infer<typeof UPDATE_WORKSPACE_SCHEMA>;
 export type DeleteUserInput = z.infer<typeof DELETE_USER_PARAM_SCHEMA>;
+export type UpdateUserRoleInput = z.infer<typeof UPDATE_USER_ROLE_SCHEMA>;
 export type CreateInvitationInput = z.infer<typeof CREATE_INVITATION_SCHEMA>;
 export type AcceptInvitationInput = z.infer<typeof ACCEPT_INVITATION_SCHEMA>;
 export type InvitationQuery = z.infer<typeof INVITATION_QUERY_SCHEMA>;

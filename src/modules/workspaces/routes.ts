@@ -6,6 +6,7 @@ import {
   UPDATE_WORKSPACE_SCHEMA,
   WORKSPACE_ID_PARAM_SCHEMA,
   DELETE_USER_PARAM_SCHEMA,
+  UPDATE_USER_ROLE_SCHEMA,
   CREATE_INVITATION_SCHEMA,
   ACCEPT_INVITATION_SCHEMA,
   INVITATION_QUERY_SCHEMA,
@@ -18,6 +19,7 @@ import {
   deleteWorkspace,
   inviteUserToWorkspace,
   deleteUserFromWorkspace,
+  updateUserRoleInWorkspace,
   createInvitation,
   acceptInvitation,
   getPendingInvitations,
@@ -150,6 +152,36 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         data: result,
+      });
+    },
+  });
+
+  // Update user role in workspace (admin only)
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "PUT",
+    url: "/:workspaceId/users/:userId",
+    schema: {
+      params: z.object({
+        workspaceId: z.string().min(1, "Workspace ID is required"),
+        userId: z.string().min(1, "User ID is required"),
+      }),
+      body: UPDATE_USER_ROLE_SCHEMA,
+    },
+    handler: async (request, reply) => {
+      const { workspaceId, userId: targetUserId } = request.params;
+      const { userId = "" } = request.user || {};
+      const input = request.body;
+      const result = await updateUserRoleInWorkspace(
+        prisma,
+        workspaceId,
+        targetUserId,
+        input,
+        userId,
+      );
+
+      return reply.send({
+        data: result,
+        message: "User role updated successfully",
       });
     },
   });
