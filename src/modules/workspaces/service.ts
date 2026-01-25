@@ -9,7 +9,12 @@ import {
   InvitationResponse,
   InvitationQuery,
 } from "./types";
-import { AppError, ConflictError, NotFoundError, ValidationError } from "../../plugins/error/plugin";
+import {
+  AppError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from "../../plugins/error/plugin";
 import { randomUUID } from "crypto";
 
 /**
@@ -18,7 +23,7 @@ import { randomUUID } from "crypto";
 export async function createWorkspace(
   prisma: PrismaClient,
   input: CreateWorkspaceInput,
-  userId: string
+  userId: string,
 ): Promise<WorkspaceResponse> {
   const { name } = input;
 
@@ -61,7 +66,7 @@ export async function createWorkspace(
  */
 export async function getWorkspaces(
   prisma: PrismaClient,
-  userId: string
+  userId: string,
 ): Promise<WorkspaceResponse[]> {
   const profiles = await prisma.profile.findMany({
     where: { userId },
@@ -89,7 +94,7 @@ export async function updateWorkspace(
   prisma: PrismaClient,
   id: string,
   input: UpdateWorkspaceInput,
-  userId: string
+  userId: string,
 ): Promise<WorkspaceResponse> {
   // Verify user is admin of the workspace
   const profile = await prisma.profile.findUnique({
@@ -106,7 +111,7 @@ export async function updateWorkspace(
     throw new AppError(
       "You are not authorized to update this workspace",
       403,
-      "FORBIDDEN"
+      "FORBIDDEN",
     );
   }
 
@@ -142,7 +147,7 @@ export async function updateWorkspace(
 export async function deleteWorkspace(
   prisma: PrismaClient,
   id: string,
-  userId: string
+  userId: string,
 ): Promise<void> {
   const profile = await prisma.profile.findUnique({
     where: {
@@ -158,7 +163,7 @@ export async function deleteWorkspace(
     throw new AppError(
       "You are not authorized to delete this workspace",
       403,
-      "FORBIDDEN"
+      "FORBIDDEN",
     );
   }
 
@@ -174,7 +179,7 @@ export async function createInvitation(
   prisma: PrismaClient,
   input: CreateInvitationInput,
   inviterId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<InvitationResponse> {
   const { email, role = "USER" } = input;
 
@@ -256,7 +261,7 @@ export async function inviteUserToWorkspace(
   prisma: PrismaClient,
   workspaceId: string,
   input: CreateInvitationInput,
-  inviterId: string
+  inviterId: string,
 ): Promise<InvitationResponse> {
   // Verify inviter is admin of the workspace
   const profile = await prisma.profile.findUnique({
@@ -273,7 +278,7 @@ export async function inviteUserToWorkspace(
     throw new AppError(
       "You are not authorized to invite users to this workspace",
       403,
-      "FORBIDDEN"
+      "FORBIDDEN",
     );
   }
 
@@ -287,7 +292,7 @@ export async function inviteUserToWorkspace(
 export async function acceptInvitation(
   prisma: PrismaClient,
   input: AcceptInvitationInput,
-  userId: string
+  userId: string,
 ) {
   const { token } = input;
 
@@ -319,7 +324,9 @@ export async function acceptInvitation(
 
     // Verify that the logged-in user's email matches the invitation email
     if (user.email !== invitation.email) {
-      throw new ValidationError("This invitation was sent to a different email address");
+      throw new ValidationError(
+        "This invitation was sent to a different email address",
+      );
     }
 
     // Check if user is already a member of the workspace
@@ -364,7 +371,7 @@ export async function acceptInvitation(
 export async function getPendingInvitations(
   prisma: PrismaClient,
   workspaceId: string,
-  query: InvitationQuery
+  query: InvitationQuery,
 ): Promise<InvitationResponse[]> {
   const { page, limit } = query;
   const skip = (page - 1) * limit;
@@ -395,7 +402,7 @@ export async function getPendingInvitations(
 export async function deleteInvitation(
   prisma: PrismaClient,
   id: string,
-  workspaceId: string
+  workspaceId: string,
 ) {
   await prisma.invitation.delete({
     where: {
@@ -412,7 +419,7 @@ export async function deleteUserFromWorkspace(
   prisma: PrismaClient,
   workspaceId: string,
   input: DeleteUserInput,
-  adminId: string
+  adminId: string,
 ): Promise<void> {
   const { userId } = input;
 
@@ -431,7 +438,7 @@ export async function deleteUserFromWorkspace(
     throw new AppError(
       "You are not authorized to remove users from this workspace",
       403,
-      "FORBIDDEN"
+      "FORBIDDEN",
     );
   }
 
@@ -440,7 +447,7 @@ export async function deleteUserFromWorkspace(
     throw new AppError(
       "You cannot remove yourself from the workspace",
       400,
-      "BAD_REQUEST"
+      "BAD_REQUEST",
     );
   }
 
@@ -458,7 +465,7 @@ export async function deleteUserFromWorkspace(
     throw new AppError(
       "User is not a member of this workspace",
       404,
-      "NOT_FOUND"
+      "NOT_FOUND",
     );
   }
 
