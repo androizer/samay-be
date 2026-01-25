@@ -5,7 +5,7 @@ import {
   CREATE_WORKSPACE_SCHEMA,
   UPDATE_WORKSPACE_SCHEMA,
   WORKSPACE_ID_PARAM_SCHEMA,
-  DELETE_USER_SCHEMA,
+  DELETE_USER_PARAM_SCHEMA,
   CREATE_INVITATION_SCHEMA,
   ACCEPT_INVITATION_SCHEMA,
   INVITATION_QUERY_SCHEMA,
@@ -13,6 +13,7 @@ import {
 import {
   createWorkspace,
   getWorkspaces,
+  getWorkspaceById,
   updateWorkspace,
   deleteWorkspace,
   inviteUserToWorkspace,
@@ -21,6 +22,7 @@ import {
   acceptInvitation,
   getPendingInvitations,
   deleteInvitation,
+  getWorkspaceUsers,
 } from "./service";
 
 const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
@@ -52,6 +54,24 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
     handler: async (request, reply) => {
       const { userId = "" } = request.user || {};
       const result = await getWorkspaces(prisma, userId);
+
+      return reply.send({
+        data: result,
+      });
+    },
+  });
+
+  // Get workspace by ID
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "GET",
+    url: "/:id",
+    schema: {
+      params: WORKSPACE_ID_PARAM_SCHEMA,
+    },
+    handler: async (request, reply) => {
+      const { id } = request.params;
+      const { userId = "" } = request.user || {};
+      const result = await getWorkspaceById(prisma, id, userId);
 
       return reply.send({
         data: result,
@@ -102,7 +122,7 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
   // Invite user to workspace (admin only)
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "POST",
-    url: "/:id/invite",
+    url: "/:id/users",
     schema: {
       params: WORKSPACE_ID_PARAM_SCHEMA,
       body: CREATE_INVITATION_SCHEMA,
@@ -120,19 +140,35 @@ const workspaceRoutes: FastifyPluginAsync = async (fastify) => {
     },
   });
 
+  // Get all users in workspace
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "GET",
+    url: "/users",
+    handler: async (request, reply) => {
+      const { workspaceId = "" } = request.user || {};
+      const result = await getWorkspaceUsers(prisma, workspaceId);
+
+      return reply.send({
+        data: result,
+      });
+    },
+  });
+
   // Delete user from workspace (admin only)
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "DELETE",
-    url: "/:id/users",
+    url: "/:id/users/:userId",
     schema: {
-      params: WORKSPACE_ID_PARAM_SCHEMA,
-      body: DELETE_USER_SCHEMA,
+      params: DELETE_USER_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { id } = request.params;
       const { userId = "" } = request.user || {};
-      const input = request.body;
-      await deleteUserFromWorkspace(prisma, id, input, userId);
+      const { id, userId: targetUserId } = request.params;
+      await deleteUserFromWorkspace(
+        prisma,
+        { userId: targetUserId, id },
+        userId,
+      );
 
       return reply.send({
         message: "User removed from workspace successfully",

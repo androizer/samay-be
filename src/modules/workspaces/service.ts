@@ -8,6 +8,8 @@ import {
   AcceptInvitationInput,
   InvitationResponse,
   InvitationQuery,
+  WorkspaceUserResponse,
+  WorkspaceWithProfilesResponse,
 } from "./types";
 import {
   AppError,
@@ -85,6 +87,76 @@ export async function getWorkspaces(
     isDefault: profile.isDefault,
     workspaceName: profile.workspace.name,
   }));
+}
+
+/**
+ * Get workspace by ID with all profiles (only if user is a member)
+ */
+export async function getWorkspaceById(
+  prisma: PrismaClient,
+  workspaceId: string,
+  userId: string,
+): Promise<WorkspaceWithProfilesResponse> {
+  // Check if user is a member of the workspace
+  const profile = await prisma.profile.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+    include: {
+      workspace: true,
+    },
+  });
+
+  if (!profile) {
+    throw new NotFoundError(
+      "Workspace not found or you are not a member of this workspace",
+    );
+  }
+
+  // Get all profiles in the workspace
+  const profiles = await prisma.profile.findMany({
+    where: {
+      workspaceId,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { joinedAt: "asc" },
+  });
+
+  const workspace: WorkspaceResponse = {
+    id: profile.workspace.id,
+    name: profile.workspace.name,
+    role: profile.role,
+    createdAt: profile.workspace.createdAt,
+    updatedAt: profile.workspace.updatedAt,
+    isDefault: profile.isDefault,
+    workspaceName: profile.workspace.name,
+  };
+
+  const profileData: WorkspaceUserResponse[] = profiles.map((p) => ({
+    id: p.id,
+    userId: p.userId,
+    name: p.name,
+    email: p.user.email,
+    role: p.role,
+    joinedAt: p.joinedAt,
+    isDefault: p.isDefault,
+    isVerified: p.isVerified,
+  }));
+
+  return {
+    workspace,
+    profiles: profileData,
+  };
 }
 
 /**
@@ -417,17 +489,16 @@ export async function deleteInvitation(
  */
 export async function deleteUserFromWorkspace(
   prisma: PrismaClient,
-  workspaceId: string,
   input: DeleteUserInput,
   adminId: string,
 ): Promise<void> {
-  const { userId } = input;
+  const { userId, id } = input;
 
   // Verify requester is admin of the workspace
   const adminProfile = await prisma.profile.findUnique({
     where: {
       workspaceId_userId: {
-        workspaceId,
+        workspaceId: id,
         userId: adminId,
       },
       role: Role.ADMIN,
@@ -455,7 +526,7 @@ export async function deleteUserFromWorkspace(
   const userProfile = await prisma.profile.findUnique({
     where: {
       workspaceId_userId: {
-        workspaceId,
+        workspaceId: id,
         userId,
       },
     },
@@ -473,9 +544,43 @@ export async function deleteUserFromWorkspace(
   await prisma.profile.delete({
     where: {
       workspaceId_userId: {
-        workspaceId,
+        workspaceId: id,
         userId,
       },
     },
   });
+}
+
+/**
+ * Get all users in a workspace
+ */
+export async function getWorkspaceUsers(
+  prisma: PrismaClient,
+  workspaceId: string,
+): Promise<WorkspaceUserResponse[]> {
+  const profiles = await prisma.profile.findMany({
+    where: {
+      workspaceId,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { joinedAt: "asc" },
+  });
+
+  return profiles.map((profile) => ({
+    id: profile.id,
+    userId: profile.userId,
+    name: profile.name,
+    email: profile.user.email,
+    role: profile.role,
+    joinedAt: profile.joinedAt,
+    isDefault: profile.isDefault,
+    isVerified: profile.isVerified,
+  }));
 }

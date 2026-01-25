@@ -13,8 +13,9 @@ export const WORKSPACE_ID_PARAM_SCHEMA = z.object({
   id: z.string().min(1, "Workspace ID is required"),
 });
 
-export const DELETE_USER_SCHEMA = z.object({
+export const DELETE_USER_PARAM_SCHEMA = z.object({
   userId: z.string().min(1, "User ID is required"),
+  id: z.string().min(1, "Workspace ID is required"),
 });
 
 // Invitation schemas
