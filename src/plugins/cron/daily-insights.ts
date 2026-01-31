@@ -5,7 +5,6 @@ import OpenAI from "openai";
 import { z } from "zod/v3";
 import { zodResponseFormat } from "openai/helpers/zod";
 
-
 // Run every day at 00:01
 const CRON_EXPRESSION = "1 0 * * *";
 const EXCLUDED_APPS = ["loginwindow", "dock"];
@@ -20,8 +19,18 @@ const openaiClient = process.env.OPENAI_API_KEY
   : null;
 
 const activitySummaryResponseSchema = z.object({
-  dailyInsights: z.array(z.string()).min(5).max(10).describe("Conversational summary of yesterday's accomplishments and work patterns"),
-  improvementPlan: z.array(z.string()).min(5).max(10).describe("Friendly, actionable tips to boost productivity today"),
+  dailyInsights: z
+    .array(z.string())
+    .min(5)
+    .max(10)
+    .describe(
+      "Conversational summary of yesterday's accomplishments and work patterns"
+    ),
+  improvementPlan: z
+    .array(z.string())
+    .min(5)
+    .max(10)
+    .describe("Friendly, actionable tips to boost productivity today"),
 });
 
 const ACTIVITY_SUMMARY_SYSTEM_PROMPT = `You are a friendly productivity coach helping users understand their work patterns.
@@ -62,9 +71,9 @@ function convertToIST(utcDateString: string): string {
       timeZone: "Asia/Kolkata",
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true
+      hour12: true,
     });
-  } catch (e) {
+  } catch {
     return utcDateString;
   }
 }
@@ -84,21 +93,27 @@ function formatActivitiesForPrompt(activities: TopActivityResponse[]): string {
         ((activity.duration || 0) / totalDuration) * 100
       );
       const tag = activity.tag ? `[${activity.tag}]` : "[Untagged]";
-      
+
       let timestamps = "";
       if (activity.mergedTimestamp) {
-        const parts = activity.mergedTimestamp.split(",").filter(p => p.trim().length > 0);
+        const parts = activity.mergedTimestamp
+          .split(",")
+          .filter((p) => p.trim().length > 0);
         // Limit to first 20 timestamps to avoid token limit issues if there are too many
-        const limitedParts = parts.slice(0, 20); 
-        const formattedParts = limitedParts.map(part => {
+        const limitedParts = parts.slice(0, 20);
+        const formattedParts = limitedParts
+          .map((part) => {
             const [ts, dur] = part.split("|");
             if (!ts) return "";
             return `${convertToIST(ts)} (${dur}s)`;
-        }).filter(Boolean);
-        
-        timestamps = `\n   Timestamps (IST): ${formattedParts.join(", ")}${parts.length > 20 ? "..." : ""}`;
+          })
+          .filter(Boolean);
+
+        timestamps = `\n   Timestamps (IST): ${formattedParts.join(", ")}${
+          parts.length > 20 ? "..." : ""
+        }`;
       }
-      
+
       return `${index + 1}. ${activity.app} → "${activity.title}" ${tag}
    Duration: ${durationHours}h (${durationMinutes}min) | ${percentage}% of time${timestamps}`;
     })
@@ -106,7 +121,7 @@ function formatActivitiesForPrompt(activities: TopActivityResponse[]): string {
 }
 
 async function getTopActivities(
-  userId: string,
+  profileId: string,
   query: {
     startDate?: string;
     endDate?: string;
@@ -118,7 +133,7 @@ async function getTopActivities(
   const topActivities = await prisma.activity.groupBy({
     by: ["app", "title", "autoTags", "mergedTimestamp"],
     where: {
-      userId,
+      profileId,
       timestamp: {
         gte: startDate,
         lte: endDate,
@@ -143,13 +158,13 @@ async function getTopActivities(
  * Generate insights for a specific user for a given date range
  */
 async function generateUserInsights(
-  userId: string,
+  profileId: string,
   startDate: string,
   endDate: string,
   prisma: PrismaClient
 ) {
   const activities = await getTopActivities(
-    userId,
+    profileId,
     {
       startDate,
       endDate,
@@ -160,7 +175,9 @@ async function generateUserInsights(
   if (!activities || activities.length === 0) {
     return {
       dailyInsights: ["No activities recorded for yesterday."],
-      improvementPlan: ["Ensure your activity tracker is running to get insights."],
+      improvementPlan: [
+        "Ensure your activity tracker is running to get insights.",
+      ],
     };
   }
 
@@ -172,7 +189,7 @@ async function generateUserInsights(
     (sum, activity) => sum + (activity.duration || 0),
     0
   );
-  
+
   const userPrompt = `ACTIVITY ANALYSIS DATA:
 Date range: ${startDate} -> ${endDate}
 Total duration tracked: ${Math.round(totalDuration / 60)} minutes
@@ -218,23 +235,25 @@ REMINDER: The provided timestamps are in IST. Use them as is.`;
   }
 }
 
-export async function executeDailyInsightsTask(fastify: FastifyInstance): Promise<void> {
+export async function executeDailyInsightsTask(
+  fastify: FastifyInstance
+): Promise<void> {
   console.log("Starting daily insights task");
 
   try {
-    // Get all users
-    const users = await fastify.prisma.user.findMany();
-    console.log(`Found ${users.length} users to process`);
+    // Get all profiles
+    const profiles = await fastify.prisma.profile.findMany();
+    console.log(`Found ${profiles.length} profiles to process`);
 
     // Calculate yesterday's date range
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     // Set to start of day (00:00:00)
     yesterday.setHours(0, 0, 0, 0);
     const startDate = yesterday.toISOString();
-    
+
     // Set to end of day (23:59:59.999)
     const endOfYesterday = new Date(yesterday);
     endOfYesterday.setHours(23, 59, 59, 999);
@@ -242,51 +261,69 @@ export async function executeDailyInsightsTask(fastify: FastifyInstance): Promis
 
     console.log(`Generating insights for period: ${startDate} to ${endDate}`);
 
-    for (const user of users) {
+    for (const profile of profiles) {
       try {
-        console.log(`Processing user ${user.id} (${user.email})`);
-        
+        console.log(`Processing profile ${profile.id}`);
+
         const summary = await generateUserInsights(
-          user.id,
+          profile.id,
           startDate,
           endDate,
           fastify.prisma
         );
 
         // Only save to database if insights were successfully generated
-        if (summary.dailyInsights.length > 0 && 
-            !summary.dailyInsights.includes("No activities recorded for yesterday.") &&
-            !summary.dailyInsights.includes("Error generating insights.")) {
-          
+        if (
+          summary.dailyInsights.length > 0 &&
+          !summary.dailyInsights.includes(
+            "No activities recorded for yesterday."
+          ) &&
+          !summary.dailyInsights.includes("Error generating insights.")
+        ) {
           // Normalize the date to remove time component for unique constraint matching
           const normalizedDate = new Date(startDate);
           normalizedDate.setHours(0, 0, 0, 0);
-          
-          // Save to database (upsert to override if exists)
-          await fastify.prisma.dailyInsight.upsert({
+
+          // Set end of day for date range query
+          const endOfNormalizedDate = new Date(normalizedDate);
+          endOfNormalizedDate.setHours(23, 59, 59, 999);
+
+          // Check if insight already exists for this date
+          const existingInsight = await fastify.prisma.dailyInsight.findFirst({
             where: {
-              userId_date: {
-                userId: user.id,
-                date: normalizedDate,
+              profileId: profile.id,
+              date: {
+                gte: normalizedDate,
+                lte: endOfNormalizedDate,
               },
             },
-            update: {
-              dailyInsights: summary.dailyInsights,
-              improvementPlan: summary.improvementPlan,
-            },
-            create: {
-              userId: user.id,
-              dailyInsights: summary.dailyInsights,
-              improvementPlan: summary.improvementPlan,
-              date: new Date(startDate),
-            },
           });
+
+          // Update or create the insight
+          if (existingInsight) {
+            await fastify.prisma.dailyInsight.update({
+              where: {
+                id: existingInsight.id,
+              },
+              data: {
+                dailyInsights: summary.dailyInsights,
+                improvementPlan: summary.improvementPlan,
+              },
+            });
+          } else {
+            await fastify.prisma.dailyInsight.create({
+              data: {
+                profileId: profile.id,
+                dailyInsights: summary.dailyInsights,
+                improvementPlan: summary.improvementPlan,
+                date: normalizedDate,
+              },
+            });
+          }
         }
-
-
       } catch (err) {
-        console.error(`Error processing user ${user.id}:`, err);
-        // Continue with next user
+        console.error(`Error processing profile ${profile.id}:`, err);
+        // Continue with next profile
       }
     }
 
@@ -301,9 +338,9 @@ export const createDailyInsightsJob = (fastify: FastifyInstance) => {
   const taskFunction = () => executeDailyInsightsTask(fastify);
 
   // Run immediately
-  taskFunction().catch((err) => {
-    console.error("Immediate daily insights task error:", err);
-  });
+  // taskFunction().catch((err) => {
+  //   console.error("Immediate daily insights task error:", err);
+  // });
 
   const task = new AsyncTask(
     "daily insights task",

@@ -1,9 +1,9 @@
 import fp from "fastify-plugin";
 import { FastifyPluginAsync } from "fastify";
 import { publicRoutes, isAdminRoute } from "./routes";
-import { validateToken } from "../../modules/auth/service";
 import { JWTPayload } from "./types";
 import { AppError, AuthorizationError } from "../error/plugin";
+import jwt from "jsonwebtoken";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -27,22 +27,25 @@ const authMiddleware: FastifyPluginAsync = fp(async (fastify) => {
     const token = authHeader.split(" ")[1];
     if (!token) throw new AppError("JsonWebTokenError", 401);
 
-    const user = await validateToken(token, fastify.prisma);
-    if (!user) throw new AppError("JsonWebTokenError", 401);
+    const decoded = jwt.decode(token) as JWTPayload;
 
-    const payload: JWTPayload = {
-      userId: user.id,
-      role: user.role,
-    };
+    if (
+      !decoded ||
+      !decoded.userId ||
+      !decoded.profileId ||
+      !decoded.workspaceId
+    ) {
+      throw new AppError("JsonWebTokenError", 401);
+    }
 
     // Check admin routes access
-    if (payload.role != "ADMIN") {
+    if (decoded.role != "ADMIN") {
       if (isAdminRoute(method, url)) {
         throw new AuthorizationError();
       }
     }
 
-    request.user = payload;
+    request.user = decoded;
   });
 });
 

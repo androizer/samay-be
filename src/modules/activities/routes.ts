@@ -36,9 +36,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: z.array(CREATE_ACTIVITY_SCHEMA),
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const input = request.body;
-      await createActivity(input, userId, prisma);
+      await createActivity(input, profileId, prisma);
 
       return reply.status(201).send({
         message: "Activities created successfully",
@@ -54,9 +54,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getActivities(userId, query, prisma);
+      const result = await getActivities(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -69,8 +69,8 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/stats",
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
-      const result = await getActivityStats(userId, prisma);
+      const { profileId = "" } = request.user || {};
+      const result = await getActivityStats(profileId, prisma);
 
       return reply.send({
         data: result,
@@ -86,9 +86,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: TOP_ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getTopApps(userId, query, prisma);
+      const result = await getTopApps(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -104,9 +104,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: TOP_ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const query = request.query;
-      const result = await getTopActivities(userId, query, prisma);
+      const result = await getTopActivities(profileId, query, prisma);
 
       return reply.send({
         data: result,
@@ -123,10 +123,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: UPDATE_ACTIVITY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { id } = request.params;
       const input = request.body;
-      const result = await updateActivity(id, input, userId, prisma);
+      const result = await updateActivity(id, input, profileId, prisma);
 
       return reply.send({
         data: result,
@@ -142,9 +142,9 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       params: ACTIVITY_ID_PARAM_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { id } = request.params;
-      await deleteActivity(id, userId, prisma);
+      await deleteActivity(id, profileId, prisma);
 
       return reply.send({
         message: "Activity deleted successfully",
@@ -160,10 +160,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: SELECT_ACTIVITIES_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { activityIds, selected } = request.body;
       // TODO: Assign project to activities
-      await selectActivities(activityIds, userId, prisma, selected);
+      await selectActivities(activityIds, profileId, prisma, selected);
 
       return reply.send({
         message: "Activities selected successfully",
@@ -179,10 +179,10 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: ACTIVITIES_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { startDate = "", endDate = "" } = request.query;
       const result = await activitiesForSelection(
-        userId,
+        profileId,
         prisma,
         startDate,
         endDate
@@ -202,11 +202,11 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       body: ADD_PROJECT_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { activityIds, projectId } = request.body;
 
       try {
-        await addActivitiesToProject(activityIds, projectId, userId, prisma);
+        await addActivitiesToProject(activityIds, projectId, profileId, prisma);
 
         return reply.send({
           message: "Activities added to project successfully",
@@ -229,11 +229,11 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
       querystring: USER_SELECT_DATA_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
+      const { profileId = "" } = request.user || {};
       const { startDate, endDate } = request.query;
 
       const result = await getUserSelectData(
-        userId,
+        profileId,
         { startDate, endDate },
         prisma
       );
@@ -245,19 +245,20 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
   // Get user select data by user ID
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "GET",
-    url: "/user-select/:userId",
+    url: "/user-select/:profileId",
     schema: {
       params: z.object({
-        userId: z.string().min(1, "User ID is required"),
+        profileId: z.string().min(1, "Profile ID is required"),
       }),
       querystring: USER_SELECT_DATA_QUERY_SCHEMA,
     },
     handler: async (request, reply) => {
-      const { userId } = request.params;
+      const { profileId } = request.params;
+
       const { startDate, endDate } = request.query;
 
       const result = await getUserSelectData(
-        userId,
+        profileId,
         { startDate, endDate },
         prisma
       );

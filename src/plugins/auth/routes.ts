@@ -20,19 +20,25 @@ export const adminRoutes: Record<string, Record<string, boolean>> = {
     "/users/invite": true,
     "/projects": true,
     "/projects/:id/users": true,
+    "/workspaces": true,
+    "/workspaces/:id/invitations": true,
   },
   GET: {
     "/users/:id": true,
     "/activities/user-select/:id": true,
+    "/workspaces/:id/invitations": true,
   },
   PUT: {
     "/users/:id": true,
     "/projects/:id": true,
+    "/workspaces/:id": true,
   },
   DELETE: {
     "/users/:id": true,
     "/projects/:id": true,
     "/projects/:id/users/:userId": true,
+    "/workspaces/:id": true,
+    "/workspaces/:workspaceId/invitations/:id": true,
   },
 };
 

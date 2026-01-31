@@ -1,22 +1,26 @@
-import { FastifyPluginAsync } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import {
   LOGIN_SCHEMA,
   REGISTER_SCHEMA,
   GET_USER_BY_ID_SCHEMA,
+  SWITCH_WORKSPACE_SCHEMA,
+  MAKE_PROFILE_DEFAULT_SCHEMA,
   VERIFY_EMAIL_TOKEN_SCHEMA,
 } from "./schema";
 import {
   register,
   login,
-  logout,
+  // logout,
   getCurrentUser,
   getAllUsers,
   getUserById,
+  switchWorkspace,
+  makeProfileDefault,
   verifyEmailToken,
   resendVerificationEmail,
 } from "./service";
-import { ZodTypeProvider } from "fastify-type-provider-zod";
+import type { FastifyPluginAsync } from "fastify";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   const prisma = fastify.prisma;
@@ -56,14 +60,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.withTypeProvider<ZodTypeProvider>().route({
     method: "POST",
-    url: "/logout",
+    url: "/switch-workspace",
+    schema: {
+      body: SWITCH_WORKSPACE_SCHEMA,
+    },
     handler: async (request, reply) => {
-      const authHeader = request.headers.authorization || "";
-      const token = authHeader.split(" ")[1];
-      await logout(token, prisma);
+      const { userId = "" } = request.user || {};
+      const input = request.body;
+      const result = await switchWorkspace(userId, input, prisma);
 
       return reply.send({
-        message: "Logged out successfully",
+        data: result,
       });
     },
   });
@@ -72,8 +79,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/me",
     handler: async (request, reply) => {
-      const { userId = "" } = request.user || {};
-      const user = await getCurrentUser(userId, prisma);
+      const { profileId = "" } = request.user || {};
+      const user = await getCurrentUser(profileId, prisma);
       return reply.send({
         data: user,
       });
@@ -84,7 +91,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     method: "GET",
     url: "/users",
     handler: async (request, reply) => {
-      const users = await getAllUsers(prisma);
+      const { workspaceId = "" } = request.user || {};
+      const users = await getAllUsers(workspaceId, prisma);
       return reply.send({
         data: users,
       });
@@ -99,9 +107,26 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, reply) => {
       const { id } = request.params;
-      const user = await getUserById(id, prisma);
+      const { workspaceId = "" } = request.user || {};
+      const user = await getUserById(id, workspaceId, prisma);
       return reply.send({
         data: user,
+      });
+    },
+  });
+
+  fastify.withTypeProvider<ZodTypeProvider>().route({
+    method: "POST",
+    url: "/make-profile-default",
+    schema: {
+      body: MAKE_PROFILE_DEFAULT_SCHEMA,
+    },
+    handler: async (request, reply) => {
+      const { userId = "" } = request.user || {};
+      const input = request.body;
+      await makeProfileDefault(userId, input, prisma);
+      return reply.status(200).send({
+        message: "Profile set as default successfully",
       });
     },
   });
