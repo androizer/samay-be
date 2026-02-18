@@ -36,19 +36,20 @@ model Invitation {
 }
 
 model Profile {
-  id          String    @id @default(cuid())
-  workspaceId String
-  userId      String
-  name               String
-  role        Role      @default(USER)
-  joinedAt    DateTime  @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isVerified         Boolean           @default(false)
-  activities  Activity[]
-  projectUsers ProjectUser[]
-  dailyInsights DailyInsight[]
-  isDefault Boolean @default(false)
+  id              String      @id @default(cuid())
+  workspaceId     String
+  userId          String
+  name            String
+  role            Role        @default(USER)
+  joinedAt        DateTime    @default(now())
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified      Boolean     @default(false)
+  activities      Activity[]
+  projectUsers    ProjectUser[]
+  dailyInsights   DailyInsight[]
+  isDefault       Boolean     @default(false)
+
   @@unique([workspaceId, userId])
   @@map("profiles")
 }
